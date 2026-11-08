@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/eink_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/open_settings"
+            android:textColor="@color/eink_fg"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/koreader_path"
+            android:textColor="@color/eink_fg" />
+
+        <EditText
+            android:id="@+id/input_path"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="textUri"
+            android:textColor="@color/eink_fg" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/item_count"
+            android:textColor="@color/eink_fg" />
+
+        <EditText
+            android:id="@+id/input_count"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:textColor="@color/eink_fg" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/koreader_package"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_package"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <CheckBox
+            android:id="@+id/check_exclude_finished"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/exclude_finished"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_exclude_non_books"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/exclude_non_books"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_show_author"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_author"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_show_percent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_percent"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_dark"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dark_theme"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_dock_top"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dock_position_top"
+            android:textColor="@color/eink_fg" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/dock_icon_size"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_dock_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_edit_dock"
+            style="@style/EinkButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/edit_dock" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_install_bridge"
+            style="@style/EinkButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/install_bridge" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_save"
+            style="@style/EinkButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/apply_widget" />
+    </LinearLayout>
+</ScrollView>

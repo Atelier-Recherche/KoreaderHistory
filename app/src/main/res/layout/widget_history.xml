@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/eink_bg"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <LinearLayout
+        android:id="@+id/dock_top"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/dock_slot_0_top"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_1_top"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_2_top"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_3_top"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_4_top"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_5_top"
+            style="@style/WidgetDockButton" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="2dp">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/widget_name"
+            android:textColor="@color/eink_fg"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/btn_refresh"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/refresh"
+            android:padding="4dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_refresh" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/book_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/empty_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/empty_history"
+        android:textColor="@color/eink_muted"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/dock_bottom"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingTop="4dp">
+
+        <ImageView
+            android:id="@+id/dock_slot_0"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_1"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_2"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_3"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_4"
+            style="@style/WidgetDockButton" />
+        <ImageView
+            android:id="@+id/dock_slot_5"
+            style="@style/WidgetDockButton" />
+    </LinearLayout>
+</LinearLayout>

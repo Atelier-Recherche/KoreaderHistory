@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KOReader History</string>
+    <string name="widget_name">KOReader History</string>
+    <string name="app_byline">par l’Atelier</string>
+    <string name="empty_history">Aucun ouvrage récent</string>
+    <string name="need_permission">Autorisez l’accès à tous les fichiers pour lire l’historique KOReader.</string>
+    <string name="grant_storage">Accorder l’accès stockage</string>
+    <string name="open_settings">Configurer le widget</string>
+    <string name="install_bridge">Installer le bridge KOReader</string>
+    <string name="bridge_installed">Plugin athistory installé dans %1$s</string>
+    <string name="bridge_failed">Échec d’installation du bridge : %1$s</string>
+    <string name="koreader_path">Dossier KOReader</string>
+    <string name="item_count">Nombre d’ouvrages</string>
+    <string name="exclude_finished">Exclure les terminés</string>
+    <string name="exclude_non_books">Exclure non-livres (html, txt, logs…)</string>
+    <string name="show_author">Afficher l’auteur</string>
+    <string name="show_percent">Afficher le pourcentage</string>
+    <string name="dark_theme">Thème sombre (e‑ink)</string>
+    <string name="dock_position_top">Dock en haut</string>
+    <string name="koreader_package">Package KOReader</string>
+    <string name="pkg_auto">Auto</string>
+    <string name="pkg_launcher">org.koreader.launcher</string>
+    <string name="pkg_fdroid">org.koreader.launcher.fdroid</string>
+    <string name="save">Enregistrer</string>
+    <string name="refresh">Actualiser</string>
+    <string name="edit_dock">Éditer le dock</string>
+    <string name="add_slot">Ajouter une icône</string>
+    <string name="slot_label">Libellé</string>
+    <string name="slot_icon">Icône</string>
+    <string name="slot_action">Action</string>
+    <string name="action_param">Paramètre</string>
+    <string name="delete_slot">Supprimer</string>
+    <string name="apply_widget">Appliquer au widget</string>
+    <string name="no_koreader">KOReader introuvable</string>
+    <string name="about_text">Widget d’historique et dock pour KOReader.\npar l’Atelier</string>
+    <string name="pick_action_type">Choisir le type d’action</string>
+    <string name="browse_param">Parcourir (scan KOReader)</string>
+    <string name="catalog_empty">Rien trouvé — vérifiez le chemin KOReader / le bridge.</string>
+    <string name="dock_icon_size">Taille des icônes du dock</string>
+    <string name="dock_size_s">Petite (32)</string>
+    <string name="dock_size_m">Moyenne (44)</string>
+    <string name="dock_size_l">Grande (56)</string>
+</resources>

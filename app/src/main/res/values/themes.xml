@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.KOReaderHistory" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/eink_fg</item>
+        <item name="colorPrimaryVariant">@color/eink_fg</item>
+        <item name="colorOnPrimary">@color/eink_bg</item>
+        <item name="colorSecondary">@color/eink_fg</item>
+        <item name="android:statusBarColor">@color/eink_bg</item>
+        <item name="android:navigationBarColor">@color/eink_bg</item>
+        <item name="android:windowBackground">@color/eink_bg</item>
+        <item name="android:textColorPrimary">@color/eink_fg</item>
+        <item name="android:textColorSecondary">@color/eink_muted</item>
+    </style>
+</resources>
