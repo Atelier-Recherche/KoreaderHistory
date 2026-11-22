@@ -47,6 +47,16 @@
             android:textColor="@color/eink_muted"
             android:textSize="11sp" />
 
+        <TextView
+            android:id="@+id/book_pages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/eink_muted"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <ProgressBar
             android:id="@+id/book_progress"
             style="?android:attr/progressBarStyleHorizontal"

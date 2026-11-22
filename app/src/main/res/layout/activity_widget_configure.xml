@@ -88,6 +88,27 @@
             android:textColor="@color/eink_fg" />
 
         <CheckBox
+            android:id="@+id/check_use_filename"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/use_filename_title"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_show_cover"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_cover_letter"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_show_pages"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/show_pages"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
             android:id="@+id/check_dark"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -101,7 +101,7 @@ Then restart KOReader and enable the plugin if needed.
 
 * KOReader folder, package (`org.koreader.launcher` / F-Droid / auto)
 * Item count, exclude finished / non-books
-* Show author / percent, dark theme (e-ink)
+* Show author / percent / pages, filename, letter cover, dark theme
 * Dock on top, icon size, slot editing
 
 ## 🔗 Resources

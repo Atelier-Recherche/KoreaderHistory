@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
@@ -17,6 +17,8 @@ android {
 
     buildTypes {
         release {
+            // Sideload / distribution Atelier : signe avec la clÃ© debug tant qu'aucun keystore release n'est configurÃ©.
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

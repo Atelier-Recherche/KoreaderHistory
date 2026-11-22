@@ -42,16 +42,19 @@ class HistoryReader(private val prefs: WidgetPrefs) {
                 if (status.equals("complete", ignoreCase = true) || (percent != null && percent >= 0.98f)) continue
             }
 
-            val title = meta.title?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
+            val fileNameWithoutExt = file.nameWithoutExtension
+            val title = meta.title?.takeIf { it.isNotBlank() } ?: fileNameWithoutExt
 
             result.add(
                 BookEntry(
                     filePath = path,
                     time = time,
                     title = title,
+                    fileNameWithoutExt = fileNameWithoutExt,
                     author = meta.author,
                     percentFinished = percent,
                     status = status,
+                    pageCount = meta.pageCount,
                 )
             )
         }
@@ -63,6 +66,7 @@ class HistoryReader(private val prefs: WidgetPrefs) {
         val author: String?,
         val percent: Float?,
         val status: String?,
+        val pageCount: Int?,
     )
 
     private fun readMetadataMode(root: File): String {
@@ -79,7 +83,7 @@ class HistoryReader(private val prefs: WidgetPrefs) {
         ext: String,
         mode: String,
     ): SidecarMeta {
-        val empty = SidecarMeta(null, null, null, null)
+        val empty = SidecarMeta(null, null, null, null, null)
         val sidecarFile = when (mode) {
             "doc" -> File("${bookPath.substringBeforeLast('.')}.sdr", "metadata.$ext.lua")
             else -> {
@@ -103,7 +107,12 @@ class HistoryReader(private val prefs: WidgetPrefs) {
             else -> null
         }
         val status = summary?.get("status")?.toString()
-        return SidecarMeta(title, author, percent, status)
+        val pageCount = when (val p = table["doc_pages"]) {
+            is Number -> p.toInt().takeIf { it > 0 }
+            is String -> p.toIntOrNull()?.takeIf { it > 0 }
+            else -> null
+        }
+        return SidecarMeta(title, author, percent, status, pageCount)
     }
 
     companion object {

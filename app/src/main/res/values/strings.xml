@@ -16,7 +16,10 @@
     <string name="exclude_non_books">Exclure non-livres (html, txt, logs…)</string>
     <string name="show_author">Afficher l’auteur</string>
     <string name="show_percent">Afficher le pourcentage</string>
-    <string name="dark_theme">Thème sombre (e‑ink)</string>
+    <string name="use_filename_title">Afficher le nom de fichier (sans extension)</string>
+    <string name="show_cover_letter">Afficher la couverture (lettre)</string>
+    <string name="show_pages">Afficher le nombre de pages</string>
+    <string name="dark_theme">Thème sombre</string>
     <string name="dock_position_top">Dock en haut</string>
     <string name="koreader_package">Package KOReader</string>
     <string name="pkg_auto">Auto</string>
@@ -37,8 +40,14 @@
     <string name="pick_action_type">Choisir le type d’action</string>
     <string name="browse_param">Parcourir (scan KOReader)</string>
     <string name="catalog_empty">Rien trouvé — vérifiez le chemin KOReader / le bridge.</string>
+    <string name="pick_app_icon">Icône d’une app…</string>
+    <string name="reset_app_icon">Réinitialiser l’icône catalogue</string>
+    <string name="app_icon_summary">Icône app : %1$s</string>
+    <string name="app_icon_catalog">Icône catalogue</string>
     <string name="dock_icon_size">Taille des icônes du dock</string>
     <string name="dock_size_s">Petite (32)</string>
     <string name="dock_size_m">Moyenne (44)</string>
     <string name="dock_size_l">Grande (56)</string>
+    <string name="dock_size_xl">Très grande (72)</string>
+    <string name="dock_size_xxl">Très très grande (96)</string>
 </resources>

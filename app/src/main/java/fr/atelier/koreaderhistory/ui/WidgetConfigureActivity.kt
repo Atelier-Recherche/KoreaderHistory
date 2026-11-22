@@ -26,12 +26,14 @@ class WidgetConfigureActivity : AppCompatActivity() {
             getString(R.string.pkg_fdroid),
         )
     }
-    private val dockSizes = listOf(32, 44, 56)
+    private val dockSizes = listOf(32, 44, 56, 72, 96)
     private val dockSizeLabels by lazy {
         listOf(
             getString(R.string.dock_size_s),
             getString(R.string.dock_size_m),
             getString(R.string.dock_size_l),
+            getString(R.string.dock_size_xl),
+            getString(R.string.dock_size_xxl),
         )
     }
 
@@ -53,6 +55,9 @@ class WidgetConfigureActivity : AppCompatActivity() {
         binding.checkExcludeNonBooks.isChecked = prefs.excludeNonBooks
         binding.checkShowAuthor.isChecked = prefs.showAuthor
         binding.checkShowPercent.isChecked = prefs.showPercent
+        binding.checkUseFilename.isChecked = prefs.useFilenameAsTitle
+        binding.checkShowCover.isChecked = prefs.showCoverLetter
+        binding.checkShowPages.isChecked = prefs.showPages
         binding.checkDark.isChecked = prefs.darkTheme
         binding.checkDockTop.isChecked = prefs.dockOnTop
 
@@ -95,6 +100,9 @@ class WidgetConfigureActivity : AppCompatActivity() {
         prefs.excludeNonBooks = binding.checkExcludeNonBooks.isChecked
         prefs.showAuthor = binding.checkShowAuthor.isChecked
         prefs.showPercent = binding.checkShowPercent.isChecked
+        prefs.useFilenameAsTitle = binding.checkUseFilename.isChecked
+        prefs.showCoverLetter = binding.checkShowCover.isChecked
+        prefs.showPages = binding.checkShowPages.isChecked
         prefs.darkTheme = binding.checkDark.isChecked
         prefs.dockOnTop = binding.checkDockTop.isChecked
         prefs.koreaderPackageMode = packageModes.getOrElse(binding.spinnerPackage.selectedItemPosition) { "auto" }

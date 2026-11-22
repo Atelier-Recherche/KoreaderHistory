@@ -101,7 +101,7 @@ Puis redémarrer KOReader et activer le plugin si besoin.
 
 * Dossier KOReader, package (`org.koreader.launcher` / F-Droid / auto)
 * Nombre d’ouvrages, exclure terminés / non-livres
-* Afficher auteur / pourcentage, thème sombre (e-ink)
+* Afficher auteur / pourcentage / pages, nom de fichier, couverture lettre, thème sombre
 * Dock en haut, taille des icônes, édition des slots
 
 ## 🔗 Ressources

@@ -32,6 +32,18 @@ class WidgetPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_PERCENT, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_PERCENT, value).apply()
 
+    var useFilenameAsTitle: Boolean
+        get() = prefs.getBoolean(KEY_USE_FILENAME, false)
+        set(value) = prefs.edit().putBoolean(KEY_USE_FILENAME, value).apply()
+
+    var showCoverLetter: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_COVER, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_COVER, value).apply()
+
+    var showPages: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_PAGES, false)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_PAGES, value).apply()
+
     var darkTheme: Boolean
         get() = prefs.getBoolean(KEY_DARK, false)
         set(value) = prefs.edit().putBoolean(KEY_DARK, value).apply()
@@ -44,10 +56,10 @@ class WidgetPrefs(context: Context) {
         get() = prefs.getString(KEY_PKG_MODE, "auto") ?: "auto"
         set(value) = prefs.edit().putString(KEY_PKG_MODE, value).apply()
 
-    /** Dock icon size in dp: 32 (S), 44 (M), 56 (L) */
+    /** Dock icon size in dp: 32 (S), 44 (M), 56 (L), 72 (XL), 96 (XXL) */
     var dockIconSizeDp: Int
-        get() = prefs.getInt(KEY_DOCK_SIZE, 44).coerceIn(28, 72)
-        set(value) = prefs.edit().putInt(KEY_DOCK_SIZE, value.coerceIn(28, 72)).apply()
+        get() = prefs.getInt(KEY_DOCK_SIZE, 44).coerceIn(28, 120)
+        set(value) = prefs.edit().putInt(KEY_DOCK_SIZE, value.coerceIn(28, 120)).apply()
 
     fun getDockSlots(): List<DockSlot> {
         val raw = prefs.getString(KEY_DOCK, null)
@@ -65,6 +77,7 @@ class WidgetPrefs(context: Context) {
                             actionType = DockActionType.fromId(o.optString("actionType", "history")),
                             param = o.optString("param", ""),
                             param2 = o.optString("param2", ""),
+                            iconPackage = o.optString("iconPackage", ""),
                         )
                     )
                 }
@@ -83,6 +96,7 @@ class WidgetPrefs(context: Context) {
                     .put("actionType", slot.actionType.id)
                     .put("param", slot.param)
                     .put("param2", slot.param2)
+                    .put("iconPackage", slot.iconPackage)
             )
         }
         prefs.edit().putString(KEY_DOCK, arr.toString()).apply()
@@ -109,6 +123,9 @@ class WidgetPrefs(context: Context) {
         private const val KEY_EXCLUDE_NON_BOOKS = "exclude_non_books"
         private const val KEY_SHOW_AUTHOR = "show_author"
         private const val KEY_SHOW_PERCENT = "show_percent"
+        private const val KEY_USE_FILENAME = "use_filename_title"
+        private const val KEY_SHOW_COVER = "show_cover_letter"
+        private const val KEY_SHOW_PAGES = "show_pages"
         private const val KEY_DARK = "dark_theme"
         private const val KEY_DOCK_TOP = "dock_top"
         private const val KEY_PKG_MODE = "pkg_mode"

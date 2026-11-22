@@ -12,6 +12,7 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import fr.atelier.koreaderhistory.R
+import fr.atelier.koreaderhistory.data.AppIconLoader
 import fr.atelier.koreaderhistory.data.HistoryReader
 import fr.atelier.koreaderhistory.data.IconCatalog
 import fr.atelier.koreaderhistory.data.WidgetPrefs
@@ -112,9 +113,17 @@ class HistoryWidgetProvider : AppWidgetProvider() {
 
             books.forEachIndexed { index, book ->
                 val row = RemoteViews(context.packageName, R.layout.widget_book_item)
-                row.setTextViewText(R.id.cover_letter, book.coverLetter)
-                row.setTextColor(R.id.cover_letter, fg)
-                row.setTextViewText(R.id.book_title, book.title)
+                val displayTitle = book.displayTitle(prefs.useFilenameAsTitle)
+
+                if (prefs.showCoverLetter) {
+                    row.setViewVisibility(R.id.cover_letter, View.VISIBLE)
+                    row.setTextViewText(R.id.cover_letter, book.coverLetter(prefs.useFilenameAsTitle))
+                    row.setTextColor(R.id.cover_letter, fg)
+                } else {
+                    row.setViewVisibility(R.id.cover_letter, View.GONE)
+                }
+
+                row.setTextViewText(R.id.book_title, displayTitle)
                 row.setTextColor(R.id.book_title, fg)
 
                 if (prefs.showAuthor && !book.author.isNullOrBlank()) {
@@ -123,6 +132,14 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                     row.setTextColor(R.id.book_author, muted)
                 } else {
                     row.setViewVisibility(R.id.book_author, View.GONE)
+                }
+
+                if (prefs.showPages && book.pageCount != null) {
+                    row.setViewVisibility(R.id.book_pages, View.VISIBLE)
+                    row.setTextViewText(R.id.book_pages, "${book.pageCount} p.")
+                    row.setTextColor(R.id.book_pages, muted)
+                } else {
+                    row.setViewVisibility(R.id.book_pages, View.GONE)
                 }
 
                 val pct = book.displayPercent
@@ -185,7 +202,12 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                     continue
                 }
                 views.setViewVisibility(viewId, View.VISIBLE)
-                views.setImageViewResource(viewId, IconCatalog.resId(slot.iconKey))
+                val appIcon = AppIconLoader.loadBitmap(context, slot.iconPackage, sizeDp)
+                if (appIcon != null) {
+                    views.setImageViewBitmap(viewId, appIcon)
+                } else {
+                    views.setImageViewResource(viewId, IconCatalog.resId(slot.iconKey))
+                }
                 views.setContentDescription(viewId, slot.label)
                 applyDockSize(views, viewId, sizeDp)
 
@@ -206,7 +228,9 @@ class HistoryWidgetProvider : AppWidgetProvider() {
             val pad = when {
                 sizeDp <= 36 -> 4
                 sizeDp <= 48 -> 6
-                else -> 8
+                sizeDp <= 64 -> 8
+                sizeDp <= 80 -> 10
+                else -> 12
             }
             views.setViewPadding(viewId, pad, pad, pad, pad)
         }

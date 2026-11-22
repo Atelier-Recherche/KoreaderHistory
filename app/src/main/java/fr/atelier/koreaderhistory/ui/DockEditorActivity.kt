@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import fr.atelier.koreaderhistory.data.AppIconLoader
 import fr.atelier.koreaderhistory.data.DockActionType
 import fr.atelier.koreaderhistory.data.DockSlot
 import fr.atelier.koreaderhistory.data.IconCatalog
@@ -89,7 +90,12 @@ class DockEditorActivity : AppCompatActivity() {
                     append(slot.actionType.label)
                     if (slot.param.isNotBlank()) append(" — ").append(slot.param)
                 }
-                binding.slotIcon.setImageResource(IconCatalog.resId(slot.iconKey))
+                val appIcon = AppIconLoader.loadDrawable(binding.root.context, slot.iconPackage)
+                if (appIcon != null) {
+                    binding.slotIcon.setImageDrawable(appIcon)
+                } else {
+                    binding.slotIcon.setImageResource(IconCatalog.resId(slot.iconKey))
+                }
                 binding.root.setOnClickListener { onClick(slot) }
             }
         }

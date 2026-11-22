@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import fr.atelier.koreaderhistory.R
+import fr.atelier.koreaderhistory.data.AppIconLoader
 import fr.atelier.koreaderhistory.data.CatalogItem
 import fr.atelier.koreaderhistory.data.DockActionType
 import fr.atelier.koreaderhistory.data.DockSlot
@@ -20,6 +21,7 @@ class DockSlotEditActivity : AppCompatActivity() {
     private lateinit var prefs: WidgetPrefs
     private var slotId: String = ""
     private var actionType: DockActionType = DockActionType.OPEN_KOREADER
+    private var iconPackage: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,6 +39,7 @@ class DockSlotEditActivity : AppCompatActivity() {
         }
 
         actionType = slot.actionType
+        iconPackage = slot.iconPackage
         binding.inputLabel.setText(slot.label)
         binding.inputParam.setText(slot.param)
         binding.inputParam2.setText(slot.param2)
@@ -50,12 +53,47 @@ class DockSlotEditActivity : AppCompatActivity() {
 
         binding.btnPickAction.setOnClickListener { showActionTypePicker() }
         binding.btnBrowseParam.setOnClickListener { showParamBrowser() }
+        binding.btnPickAppIcon.setOnClickListener { showAppIconPicker() }
+        binding.btnResetAppIcon.setOnClickListener {
+            iconPackage = ""
+            refreshIconSummary()
+        }
         binding.btnSave.setOnClickListener { save() }
         binding.btnDelete.setOnClickListener {
             prefs.removeDockSlot(slotId)
             finish()
         }
         refreshActionUi()
+        refreshIconSummary()
+    }
+
+    private fun refreshIconSummary() {
+        binding.iconAppSummary.text = if (iconPackage.isNotBlank()) {
+            val label = runCatching {
+                packageManager.getApplicationLabel(
+                    packageManager.getApplicationInfo(iconPackage, 0)
+                ).toString()
+            }.getOrDefault(iconPackage)
+            getString(R.string.app_icon_summary, label)
+        } else {
+            getString(R.string.app_icon_catalog)
+        }
+    }
+
+    private fun showAppIconPicker() {
+        val apps = AppIconLoader.listLauncherApps(this)
+        if (apps.isEmpty()) {
+            Toast.makeText(this, R.string.catalog_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.pick_app_icon)
+            .setItems(apps.map { it.label }.toTypedArray()) { _, which ->
+                iconPackage = apps[which].packageName
+                refreshIconSummary()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun refreshActionUi() {
@@ -184,6 +222,7 @@ class DockSlotEditActivity : AppCompatActivity() {
             actionType = actionType,
             param = binding.inputParam.text?.toString().orEmpty(),
             param2 = binding.inputParam2.text?.toString().orEmpty(),
+            iconPackage = iconPackage,
         )
         prefs.upsertDockSlot(updated)
         finish()

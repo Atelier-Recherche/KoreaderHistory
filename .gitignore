@@ -12,3 +12,7 @@
 *.apk
 *.ap_
 *.dex
+*.zip
+VERSION
+_stage_release/
+old/

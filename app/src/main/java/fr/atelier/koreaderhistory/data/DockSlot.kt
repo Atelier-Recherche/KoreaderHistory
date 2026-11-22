@@ -7,4 +7,5 @@ data class DockSlot(
     val actionType: DockActionType,
     val param: String = "",
     val param2: String = "",
+    val iconPackage: String = "",
 )
