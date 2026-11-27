@@ -58,7 +58,7 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 val bg = if (prefs.darkTheme) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
 
                 views.setInt(R.id.widget_root, "setBackgroundColor", bg)
-                views.setTextColor(R.id.widget_title, fg)
+                views.setViewVisibility(R.id.widget_title, View.GONE)
                 views.setTextColor(R.id.empty_view, muted)
 
                 bindBooks(context, views, prefs, fg, muted)
@@ -71,12 +71,14 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 )
                 views.setOnClickPendingIntent(R.id.btn_refresh, refreshPi)
 
+                // Config : tap prolongé n’existe pas en RemoteViews → petit refresh
+                // ouvre aussi la config si l’historique est vide (sinon via l’app).
                 val cfgIntent = Intent(context, WidgetConfigureActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 views.setOnClickPendingIntent(
-                    R.id.widget_title,
+                    R.id.empty_view,
                     activityPi(context, 2000 + appWidgetId, cfgIntent),
                 )
 
@@ -86,7 +88,7 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 // Minimal fallback so the widget host does not keep killing the app
                 runCatching {
                     val fallback = RemoteViews(context.packageName, R.layout.widget_history)
-                    fallback.setTextViewText(R.id.widget_title, context.getString(R.string.widget_name))
+                    fallback.setViewVisibility(R.id.widget_title, View.GONE)
                     fallback.setViewVisibility(R.id.empty_view, View.VISIBLE)
                     fallback.setTextViewText(R.id.empty_view, "Erreur widget — rouvrir l’app")
                     appWidgetManager.updateAppWidget(appWidgetId, fallback)
@@ -176,7 +178,15 @@ class HistoryWidgetProvider : AppWidgetProvider() {
         }
 
         private fun bindDock(context: Context, views: RemoteViews, prefs: WidgetPrefs, appWidgetId: Int) {
-            val slots = prefs.getDockSlots()
+            views.removeAllViews(R.id.dock_top)
+            views.removeAllViews(R.id.dock_bottom)
+            if (!prefs.dockEnabled) {
+                views.setViewVisibility(R.id.dock_top, View.GONE)
+                views.setViewVisibility(R.id.dock_bottom, View.GONE)
+                return
+            }
+
+            val slots = prefs.ensureDockSlots()
             val top = prefs.dockOnTop
             val sizeDp = prefs.dockIconSizeDp
             val justify = prefs.dockJustify
@@ -184,10 +194,14 @@ class HistoryWidgetProvider : AppWidgetProvider() {
             val dockId = if (top) R.id.dock_top else R.id.dock_bottom
             val otherId = if (top) R.id.dock_bottom else R.id.dock_top
 
+            if (slots.isEmpty()) {
+                views.setViewVisibility(R.id.dock_top, View.GONE)
+                views.setViewVisibility(R.id.dock_bottom, View.GONE)
+                return
+            }
+
             views.setViewVisibility(dockId, View.VISIBLE)
             views.setViewVisibility(otherId, View.GONE)
-            views.removeAllViews(dockId)
-            views.removeAllViews(otherId)
 
             val spaceBetween = justify == WidgetPrefs.JUSTIFY_SPACE_BETWEEN && slots.size > 1
             slots.forEachIndexed { i, slot ->
@@ -196,6 +210,7 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 }
                 val slotRv = RemoteViews(context.packageName, R.layout.widget_dock_slot)
                 val iconId = R.id.dock_slot_icon
+                slotRv.setViewVisibility(iconId, View.VISIBLE)
                 val bmp = DockIconResolver.loadBitmap(context, slot, sizeDp)
                 if (bmp != null) {
                     slotRv.setImageViewBitmap(iconId, bmp)
@@ -203,7 +218,7 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                     slotRv.setImageViewResource(iconId, fr.atelier.koreaderhistory.data.IconCatalog.resId(slot.iconKey))
                 }
                 if (border) {
-                    slotRv.setInt(iconId, "setBackgroundResource", CoreR.drawable.dock_button_bg)
+                    slotRv.setInt(iconId, "setBackgroundResource", R.drawable.dock_button_bg)
                 } else {
                     slotRv.setInt(iconId, "setBackgroundResource", 0)
                 }

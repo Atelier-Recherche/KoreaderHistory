@@ -29,25 +29,40 @@ class EinkNotificationListener : NotificationListenerService() {
         return runCatching { activeNotifications?.toList().orEmpty() }.getOrDefault(emptyList())
     }
 
-    /** Inclut ongoing ; exclut résumés de groupe vides. Silencieuses en bas. */
+    /** Inclut ongoing ; exclut résumés de groupe vides/doublons. Silencieuses en bas. */
     fun visibleNotifications(): List<StatusBarNotification> {
-        return currentNotifications()
-            .filter { sbn ->
-                val n = sbn.notification ?: return@filter false
-                val isGroupSummary =
-                    (n.flags and android.app.Notification.FLAG_GROUP_SUMMARY) != 0
-                if (isGroupSummary) {
-                    val title = n.extras?.getCharSequence(android.app.Notification.EXTRA_TITLE)
-                    val text = n.extras?.getCharSequence(android.app.Notification.EXTRA_TEXT)
-                    !title.isNullOrBlank() || !text.isNullOrBlank()
-                } else {
-                    true
-                }
+        val filtered = currentNotifications().filter { sbn ->
+            val n = sbn.notification ?: return@filter false
+            val isGroupSummary =
+                (n.flags and android.app.Notification.FLAG_GROUP_SUMMARY) != 0
+            if (isGroupSummary) {
+                val title = n.extras?.getCharSequence(android.app.Notification.EXTRA_TITLE)
+                val text = n.extras?.getCharSequence(android.app.Notification.EXTRA_TEXT)
+                !title.isNullOrBlank() || !text.isNullOrBlank()
+            } else {
+                true
             }
-            .sortedWith(
-                compareBy<StatusBarNotification> { isSilent(it) }
-                    .thenByDescending { it.postTime },
-            )
+        }
+        // Collapse : si un groupe a des enfants non-summary, exclure les résumés
+        val byGroup = filtered.groupBy { sbn ->
+            sbn.groupKey?.takeIf { it.isNotBlank() } ?: sbn.key
+        }
+        val deduped = byGroup.values.flatMap { group ->
+            val hasChild = group.any { sbn ->
+                (sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY) == 0
+            }
+            if (hasChild) {
+                group.filter { sbn ->
+                    (sbn.notification.flags and android.app.Notification.FLAG_GROUP_SUMMARY) == 0
+                }
+            } else {
+                group
+            }
+        }
+        return deduped.sortedWith(
+            compareBy<StatusBarNotification> { isSilent(it) }
+                .thenByDescending { it.postTime },
+        )
     }
 
     fun isSilent(sbn: StatusBarNotification): Boolean {

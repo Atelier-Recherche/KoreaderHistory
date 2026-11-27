@@ -22,6 +22,14 @@
         android:layout_weight="1" />
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_restore_defaults"
+        style="@style/EinkButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/restore_default_dock" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_add"
         style="@style/EinkButton"
         android:layout_width="match_parent"

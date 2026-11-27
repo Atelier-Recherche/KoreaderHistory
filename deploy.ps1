@@ -101,6 +101,8 @@ if (-not $SkipInstall) {
     Write-Host "==> adb install -r launcher $launcherApk" -ForegroundColor Cyan
     $code = Invoke-AdbQuiet -AdbCmd ($prefix + @('install', '-r', $launcherApk))
     if ($code -ne 0) { throw "adb install launcher a echoue (code $code)" }
+
+    Grant-EinkPermissions -AdbPrefix $prefix
 }
 
 if (-not $SkipPlugin) {

@@ -20,6 +20,7 @@
     <string name="show_cover_letter">Afficher la couverture (lettre)</string>
     <string name="show_pages">Afficher le nombre de pages</string>
     <string name="dark_theme">Thème sombre</string>
+    <string name="dock_enabled">Afficher le dock du widget</string>
     <string name="dock_position_top">Dock en haut</string>
     <string name="koreader_package">Package KOReader</string>
     <string name="pkg_auto">Auto</string>
@@ -28,6 +29,8 @@
     <string name="save">Enregistrer</string>
     <string name="refresh">Actualiser</string>
     <string name="edit_dock">Éditer le dock</string>
+    <string name="restore_default_dock">Restaurer les raccourcis par défaut</string>
+    <string name="dock_empty_hint">Dock vide — ouvrez « Éditer le dock » ou restaurez les défauts</string>
     <string name="add_slot">Ajouter une icône</string>
     <string name="slot_label">Libellé</string>
     <string name="slot_icon">Icône</string>

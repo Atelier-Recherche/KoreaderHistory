@@ -18,6 +18,13 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.bluetooth.BluetoothAdapter
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
+import android.os.BatteryManager
+import android.text.format.DateFormat
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -27,20 +34,28 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import java.text.SimpleDateFormat
 import fr.atelier.einklauncher.databinding.ActivityHomeBinding
 import fr.atelier.einklauncher.databinding.ItemDesktopAppBinding
 import fr.atelier.einklauncher.databinding.ItemHistoryRowBinding
 import fr.atelier.koreaderhistory.core.R as CoreR
 import fr.atelier.koreaderhistory.data.AppIconLoader
 import fr.atelier.koreaderhistory.data.DesktopItem
+import fr.atelier.koreaderhistory.data.DockActionType
 import fr.atelier.koreaderhistory.data.DockExecutor
 import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.HistoryReader
+import fr.atelier.koreaderhistory.data.KoreaderCatalog
 import fr.atelier.koreaderhistory.data.KoreaderLauncher
 import fr.atelier.koreaderhistory.data.LauncherPrefs
 import fr.atelier.koreaderhistory.data.WidgetPrefs
+import java.util.Date
+import java.util.Locale
 
 class HomeActivity : AppCompatActivity() {
     private lateinit var binding: ActivityHomeBinding
@@ -52,11 +67,55 @@ class HomeActivity : AppCompatActivity() {
 
     private var pendingWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
     private var pendingProvider: ComponentName? = null
+    private var pendingIconItemId: String? = null
+    private var pendingIconAppKey: String? = null
+    private var moveMode = false
 
     private val notifReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             refreshDock()
         }
+    }
+
+    private val statusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshStatusBar()
+        }
+    }
+
+    private val pickDesktopIcon = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) {
+            pendingIconItemId = null
+            pendingIconAppKey = null
+            return@registerForActivityResult
+        }
+        val data = result.data ?: return@registerForActivityResult
+        val override = fr.atelier.koreaderhistory.data.AppIconOverride(
+            iconKey = data.getStringExtra(IconPickerActivity.EXTRA_ICON_KEY) ?: "app",
+            iconPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACKAGE).orEmpty(),
+            iconPackPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACK).orEmpty(),
+            iconDrawableName = data.getStringExtra(IconPickerActivity.EXTRA_ICON_DRAWABLE).orEmpty(),
+        )
+        val appKey = pendingIconAppKey
+        pendingIconAppKey = null
+        if (appKey != null) {
+            launcherPrefs.setAppIconOverride(appKey, override)
+            refreshDesktop()
+            return@registerForActivityResult
+        }
+        val id = pendingIconItemId ?: return@registerForActivityResult
+        pendingIconItemId = null
+        val items = launcherPrefs.getDesktopItems().toMutableList()
+        val idx = items.indexOfFirst { it.id == id }
+        if (idx < 0) return@registerForActivityResult
+        items[idx] = items[idx].copy(
+            iconKey = override.iconKey,
+            iconPackage = override.iconPackage,
+            iconPackPackage = override.iconPackPackage,
+            iconDrawableName = override.iconDrawableName,
+        )
+        launcherPrefs.setDesktopItems(items)
+        refreshDesktop()
     }
 
     private val pickProvider = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -114,6 +173,7 @@ class HomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyFullscreen()
         launcherPrefs = LauncherPrefs(this)
         widgetPrefs = WidgetPrefs(this)
         appWidgetManager = AppWidgetManager.getInstance(this)
@@ -121,10 +181,25 @@ class HomeActivity : AppCompatActivity() {
         WidgetLog.file(this, "HomeActivity onCreate host=$HOST_ID")
 
         adapter = DesktopAdapter(
+            iconSizeDp = { launcherPrefs.desktopIconSizeDp },
+            iconBorder = { launcherPrefs.desktopIconBorder },
+            labelSp = { launcherPrefs.desktopLabelSp },
+            moveMode = { moveMode },
+            resolveOverride = { item ->
+                if (item.type != "app") null
+                else {
+                    val key = if (item.activityName.isNotBlank()) {
+                        "${item.packageName}/${item.activityName}"
+                    } else item.packageName
+                    launcherPrefs.getAppIconOverride(key)
+                        ?: launcherPrefs.getAppIconOverride("${item.packageName}/")
+                }
+            },
             onClick = { item -> onDesktopClick(item) },
             onLongClick = { item -> onDesktopLongClick(item); true },
+            onMove = { item, dCol, dRow -> moveGridItem(item, dCol, dRow) },
         )
-        binding.desktopGrid.layoutManager = GridLayoutManager(this, 4)
+        binding.desktopGrid.layoutManager = GridLayoutManager(this, launcherPrefs.desktopColumns)
         binding.desktopGrid.adapter = adapter
 
         val openMenu = View.OnLongClickListener {
@@ -138,6 +213,33 @@ class HomeActivity : AppCompatActivity() {
             startActivity(Intent(this, LauncherDockEditorActivity::class.java))
             true
         }
+        binding.btnRemoveHistory.setOnClickListener { confirmRemoveHistory() }
+        binding.btnExitMoveMode.setOnClickListener { setMoveMode(false) }
+    }
+
+    private fun applyFullscreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.statusBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+    }
+
+    private fun setMoveMode(enabled: Boolean) {
+        moveMode = enabled
+        binding.moveModeBar.visibility = if (enabled) View.VISIBLE else View.GONE
+        refreshDesktop()
+        Toast.makeText(
+            this,
+            if (enabled) getString(R.string.move_mode_hint) else getString(R.string.move_mode_done),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 
     override fun onStart() {
@@ -152,22 +254,40 @@ class HomeActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        val filter = IntentFilter(EinkNotificationListener.ACTION_CHANGED)
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(notifReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(notifReceiver, filter)
-        }
+        registerReceivers()
         refreshDesktop()
         refreshDock()
         refreshHistoryPanel()
+        refreshStatusBar()
         rebuildWidgetViews()
     }
 
     override fun onPause() {
         runCatching { unregisterReceiver(notifReceiver) }
+        runCatching { unregisterReceiver(statusReceiver) }
         super.onPause()
+    }
+
+    private fun registerReceivers() {
+        val notifFilter = IntentFilter(EinkNotificationListener.ACTION_CHANGED)
+        val statusFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(WifiManager.WIFI_STATE_CHANGED_ACTION)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(ConnectivityManager.CONNECTIVITY_ACTION)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(notifReceiver, notifFilter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(statusReceiver, statusFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(notifReceiver, notifFilter)
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(statusReceiver, statusFilter)
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -193,7 +313,18 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun refreshDesktop() {
-        adapter.submit(launcherPrefs.getDesktopItems().filter { it.type != "widget" })
+        val cols = launcherPrefs.desktopColumns
+        (binding.desktopGrid.layoutManager as? GridLayoutManager)?.spanCount = cols
+        val gridItems = launcherPrefs.getDesktopItems().filter {
+            it.type == "app" || it.type == "folder" || it.type == "shortcut"
+        }
+        val byCell = gridItems.associateBy { it.cellIndex.coerceAtLeast(0) }
+        val maxIdx = (byCell.keys.maxOrNull() ?: -1).coerceAtLeast(0)
+        val cellCount = ((maxIdx / cols) + 1) * cols
+        val cells = (0 until cellCount).map { idx ->
+            byCell[idx] ?: DesktopItem(id = "empty-$idx", type = "empty", label = "", cellIndex = idx)
+        }
+        adapter.submit(cells)
     }
 
     private fun rebuildWidgetViews() {
@@ -299,14 +430,18 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun refreshHistoryPanel() {
-        val show = launcherPrefs.getDesktopItems().any { it.type == "history" }
+        val historyItem = launcherPrefs.getDesktopItems().firstOrNull { it.type == "history" }
+        val show = historyItem != null
         binding.historyPanel.visibility = if (show) View.VISIBLE else View.GONE
         if (!show) return
+        binding.btnRemoveHistory.setOnClickListener { confirmRemoveHistory() }
         binding.historyList.removeAllViews()
+        val titleSp = launcherPrefs.historyTitleSp.toFloat()
         val books = runCatching { HistoryReader(widgetPrefs).loadBooks() }.getOrDefault(emptyList())
         books.take(6).forEach { book ->
             val row = ItemHistoryRowBinding.inflate(layoutInflater, binding.historyList, false)
             row.bookTitle.text = book.displayTitle(widgetPrefs.useFilenameAsTitle)
+            row.bookTitle.textSize = titleSp
             row.bookMeta.text = buildString {
                 if (widgetPrefs.showAuthor && !book.author.isNullOrBlank()) append(book.author)
                 val pct = book.displayPercent
@@ -320,9 +455,110 @@ class HomeActivity : AppCompatActivity() {
             }
             binding.historyList.addView(row.root)
         }
+        if (books.isEmpty()) {
+            binding.historyList.addView(
+                TextView(this).apply {
+                    text = "Historique vide"
+                    setTextColor(0xFF444444.toInt())
+                    setPadding(8, 16, 8, 16)
+                },
+            )
+        }
+    }
+
+    private fun confirmRemoveHistory() {
+        val historyItem = launcherPrefs.getDesktopItems().firstOrNull { it.type == "history" } ?: return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.remove_history_panel)
+            .setMessage(R.string.remove_history_confirm)
+            .setPositiveButton(R.string.widget_remove) { _, _ -> removeDesktopItem(historyItem.id) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun refreshStatusBar() {
+        applyFullscreen()
+        val enabled = launcherPrefs.statusBarEnabled
+        binding.statusBar.visibility = if (enabled) View.VISIBLE else View.GONE
+        // Plein écran : pas de padding pour la barre système (elle est masquée)
+        binding.homeRoot.setPadding(0, 0, 0, binding.homeRoot.paddingBottom)
+        if (!enabled) return
+
+        val sp = launcherPrefs.statusBarTextSp.toFloat()
+        fun show(tv: TextView, on: Boolean, text: String) {
+            tv.visibility = if (on) View.VISIBLE else View.GONE
+            if (on) {
+                tv.text = text
+                tv.textSize = sp
+            }
+        }
+
+        val now = Date()
+        val locale = Locale.getDefault()
+        show(
+            binding.statusTime,
+            launcherPrefs.statusBarShowTime,
+            DateFormat.getTimeFormat(this).format(now),
+        )
+        show(
+            binding.statusDate,
+            launcherPrefs.statusBarShowDate,
+            formatStatusDate(now, locale),
+        )
+
+        if (launcherPrefs.statusBarShowWifi) {
+            val wifiOn = runCatching {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val net = cm.activeNetwork
+                val caps = cm.getNetworkCapabilities(net)
+                caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            }.getOrDefault(false)
+            show(binding.statusWifi, true, if (wifiOn) getString(R.string.wifi_on) else getString(R.string.wifi_off))
+        } else {
+            binding.statusWifi.visibility = View.GONE
+        }
+
+        if (launcherPrefs.statusBarShowBluetooth) {
+            val btOn = runCatching {
+                BluetoothAdapter.getDefaultAdapter()?.isEnabled == true
+            }.getOrDefault(false)
+            show(binding.statusBluetooth, true, if (btOn) getString(R.string.bt_on) else getString(R.string.bt_off))
+        } else {
+            binding.statusBluetooth.visibility = View.GONE
+        }
+
+        if (launcherPrefs.statusBarShowBattery) {
+            val sticky = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = sticky?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = sticky?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+            val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else -1
+            show(binding.statusBattery, true, if (pct >= 0) "$pct%" else "—")
+        } else {
+            binding.statusBattery.visibility = View.GONE
+        }
+    }
+
+    private fun formatStatusDate(now: Date, locale: Locale): String {
+        return when (launcherPrefs.statusBarDateFormat) {
+            LauncherPrefs.DATE_FMT_WEEKDAY ->
+                SimpleDateFormat("EEEE", locale).format(now)
+            LauncherPrefs.DATE_FMT_FULL ->
+                SimpleDateFormat("EEEE d MMMM yyyy", locale).format(now)
+            LauncherPrefs.DATE_FMT_MEDIUM ->
+                DateFormat.getMediumDateFormat(this).format(now)
+            else ->
+                SimpleDateFormat("EEE d MMM", locale).format(now)
+        }
     }
 
     private fun refreshDock() {
+        WidgetLog.file(this, "refreshDock ${launcherPrefs.readDockVisualDebug()}")
+        if (!launcherPrefs.dockEnabled) {
+            binding.launcherDock.visibility = View.GONE
+            binding.launcherDock.removeAllViews()
+            return
+        }
+        binding.launcherDock.visibility = View.VISIBLE
         binding.launcherDock.removeAllViews()
         val size = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
@@ -331,7 +567,13 @@ class HomeActivity : AppCompatActivity() {
         ).toInt()
         val border = launcherPrefs.dockIconBorder
 
-        fun addBuiltin(resId: Int, desc: String, badgeCount: Int = 0, click: () -> Unit) {
+        fun addBuiltin(
+            override: fr.atelier.koreaderhistory.data.AppIconOverride,
+            fallbackRes: Int,
+            desc: String,
+            badgeCount: Int = 0,
+            click: () -> Unit,
+        ) {
             val frame = FrameLayout(this)
             frame.layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(4, 0, 4, 0) }
             val iv = ImageView(this)
@@ -342,7 +584,8 @@ class HomeActivity : AppCompatActivity() {
             iv.setPadding(6, 6, 6, 6)
             iv.scaleType = ImageView.ScaleType.FIT_CENTER
             if (border) iv.setBackgroundResource(R.drawable.dock_button_bg)
-            iv.setImageResource(resId)
+            val custom = DockIconResolver.loadDrawable(this, override.toDockSlot())
+            if (custom != null) iv.setImageDrawable(custom) else iv.setImageResource(fallbackRes)
             iv.contentDescription = desc
             frame.addView(iv)
             if (badgeCount > 0) {
@@ -360,11 +603,20 @@ class HomeActivity : AppCompatActivity() {
             binding.launcherDock.addView(frame)
         }
 
-        addBuiltin(CoreR.drawable.ic_app, getString(R.string.launcher_drawer)) {
+        addBuiltin(
+            launcherPrefs.getDockAppsIcon(),
+            CoreR.drawable.ic_app,
+            getString(R.string.launcher_drawer),
+        ) {
             startActivity(Intent(this, AppDrawerActivity::class.java))
         }
         val notifCount = EinkNotificationListener.instance?.audibleCount() ?: 0
-        addBuiltin(CoreR.drawable.ic_dispatcher, getString(R.string.notifications_title), notifCount) {
+        addBuiltin(
+            launcherPrefs.getDockNotifsIcon(),
+            CoreR.drawable.ic_dispatcher,
+            getString(R.string.notifications_title),
+            notifCount,
+        ) {
             startActivity(Intent(this, NotificationPanelActivity::class.java))
         }
 
@@ -398,14 +650,99 @@ class HomeActivity : AppCompatActivity() {
                     .putExtra(FolderActivity.EXTRA_FOLDER_ID, item.id),
             )
             "history" -> binding.historyPanel.visibility = View.VISIBLE
+            "shortcut" -> DockExecutor.execute(this, widgetPrefs, item.toDockSlot())
         }
     }
 
     private fun onDesktopLongClick(item: DesktopItem) {
+        if (item.type == "empty") return
+        val moveOptions = listOf(
+            getString(R.string.move_left),
+            getString(R.string.move_right),
+            getString(R.string.move_up),
+            getString(R.string.move_down),
+        )
+        when (item.type) {
+            "shortcut", "folder" -> {
+                val options = (moveOptions + listOf(
+                    getString(R.string.rename),
+                    getString(R.string.choose_icon),
+                    getString(R.string.remove_from_desktop),
+                )).toTypedArray()
+                AlertDialog.Builder(this)
+                    .setTitle(item.label)
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> moveGridItem(item, -1, 0)
+                            1 -> moveGridItem(item, 1, 0)
+                            2 -> moveGridItem(item, 0, -1)
+                            3 -> moveGridItem(item, 0, 1)
+                            4 -> renameDesktopItem(item)
+                            5 -> {
+                                pendingIconItemId = item.id
+                                pickDesktopIcon.launch(Intent(this, IconPickerActivity::class.java))
+                            }
+                            6 -> removeDesktopItem(item.id)
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            "app" -> {
+                val options = (moveOptions + listOf(
+                    getString(R.string.choose_icon),
+                    getString(R.string.remove_from_desktop),
+                )).toTypedArray()
+                AlertDialog.Builder(this)
+                    .setTitle(item.label)
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> moveGridItem(item, -1, 0)
+                            1 -> moveGridItem(item, 1, 0)
+                            2 -> moveGridItem(item, 0, -1)
+                            3 -> moveGridItem(item, 0, 1)
+                            4 -> {
+                                pendingIconAppKey = if (item.activityName.isNotBlank()) {
+                                    "${item.packageName}/${item.activityName}"
+                                } else item.packageName
+                                pickDesktopIcon.launch(Intent(this, IconPickerActivity::class.java))
+                            }
+                            5 -> removeDesktopItem(item.id)
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+            else -> {
+                AlertDialog.Builder(this)
+                    .setTitle(item.label)
+                    .setItems(arrayOf(getString(R.string.remove_from_desktop))) { _, _ ->
+                        removeDesktopItem(item.id)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }
+        }
+    }
+
+    private fun moveGridItem(item: DesktopItem, dCol: Int, dRow: Int) {
+        if (launcherPrefs.moveDesktopItemOnGrid(item.id, dCol, dRow)) {
+            refreshDesktop()
+        }
+    }
+
+    private fun renameDesktopItem(item: DesktopItem) {
+        val input = EditText(this).apply {
+            setText(item.label)
+            setTextColor(0xFF000000.toInt())
+        }
         AlertDialog.Builder(this)
-            .setTitle(item.label)
-            .setItems(arrayOf(getString(R.string.remove_from_desktop))) { _, _ ->
-                removeDesktopItem(item.id)
+            .setTitle(R.string.rename)
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text?.toString().orEmpty().ifBlank { item.label }
+                launcherPrefs.updateDesktopItem(item.copy(label = name))
+                refreshDesktop()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -424,24 +761,29 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun showDesktopMenu() {
-        val options = arrayOf(
-            getString(R.string.launcher_add_history),
-            getString(R.string.launcher_add_widget),
-            getString(R.string.launcher_folder),
-            getString(R.string.edit_launcher_dock),
-            getString(R.string.open_settings),
-            getString(R.string.enable_accessibility),
-        )
+        val hasHistory = launcherPrefs.getDesktopItems().any { it.type == "history" }
+        val options = buildList {
+            add(if (moveMode) getString(R.string.move_mode_done) else getString(R.string.move_mode))
+            add(if (hasHistory) getString(R.string.remove_history_panel) else getString(R.string.launcher_add_history))
+            add(getString(R.string.launcher_add_widget))
+            add(getString(R.string.launcher_folder))
+            add(getString(R.string.launcher_add_shortcut))
+            add(getString(R.string.edit_launcher_dock))
+            add(getString(R.string.open_settings))
+            add(getString(R.string.enable_accessibility))
+        }
         AlertDialog.Builder(this)
             .setTitle(R.string.launcher_home)
-            .setItems(options) { _, which ->
+            .setItems(options.toTypedArray()) { _, which ->
                 when (which) {
-                    0 -> addHistoryPanel()
-                    1 -> requestAddWidget()
-                    2 -> createFolder()
-                    3 -> startActivity(Intent(this, LauncherDockEditorActivity::class.java))
-                    4 -> startActivity(Intent(this, LauncherSettingsActivity::class.java))
-                    5 -> startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    0 -> setMoveMode(!moveMode)
+                    1 -> if (hasHistory) confirmRemoveHistory() else addHistoryPanel()
+                    2 -> requestAddWidget()
+                    3 -> createFolder()
+                    4 -> addDesktopShortcut()
+                    5 -> startActivity(Intent(this, LauncherDockEditorActivity::class.java))
+                    6 -> startActivity(Intent(this, LauncherSettingsActivity::class.java))
+                    7 -> startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
             }
             .show()
@@ -472,10 +814,111 @@ class HomeActivity : AppCompatActivity() {
                 id = LauncherPrefs.newId(),
                 type = "folder",
                 label = getString(R.string.launcher_folder),
+                cellIndex = launcherPrefs.nextFreeCellIndex(),
             ),
         )
         launcherPrefs.setDesktopItems(items)
         refreshDesktop()
+    }
+
+    private fun addDesktopShortcut() {
+        val choices = listOf(
+            DockActionType.OPEN_KOREADER,
+            DockActionType.CONTINUE,
+            DockActionType.HISTORY,
+            DockActionType.OPEN_FOLDER,
+            DockActionType.OPEN_COLLECTION,
+            DockActionType.OPEN_PLUGIN,
+            DockActionType.SYSTEM_ACTION,
+            DockActionType.OPEN_BOOK,
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.launcher_add_shortcut)
+            .setItems(choices.map { it.label }.toTypedArray()) { _, which ->
+                val type = choices[which]
+                val iconKey = when (type) {
+                    DockActionType.OPEN_KOREADER -> "koreader"
+                    DockActionType.CONTINUE -> "continue"
+                    DockActionType.HISTORY -> "history"
+                    DockActionType.OPEN_FOLDER -> "folder"
+                    DockActionType.OPEN_COLLECTION -> "library"
+                    DockActionType.OPEN_PLUGIN -> "plugin"
+                    DockActionType.SYSTEM_ACTION -> "dispatcher"
+                    DockActionType.OPEN_BOOK -> "book"
+                    else -> "app"
+                }
+                when (type) {
+                    DockActionType.OPEN_FOLDER,
+                    DockActionType.OPEN_COLLECTION,
+                    DockActionType.OPEN_PLUGIN,
+                    DockActionType.SYSTEM_ACTION -> pickShortcutParam(type, iconKey)
+                    else -> {
+                        commitDesktopShortcut(
+                            DesktopItem(
+                                id = LauncherPrefs.newId(),
+                                type = "shortcut",
+                                label = type.label,
+                                actionType = type.id,
+                                iconKey = iconKey,
+                            ),
+                        )
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun pickShortcutParam(type: DockActionType, iconKey: String) {
+        val path = widgetPrefs.koreaderPath
+        val catalog = when (type) {
+            DockActionType.OPEN_FOLDER -> KoreaderCatalog.suggestFolders(path)
+            DockActionType.OPEN_COLLECTION -> KoreaderCatalog.listCollections(path)
+            DockActionType.OPEN_PLUGIN -> KoreaderCatalog.listPlugins(path)
+            DockActionType.SYSTEM_ACTION -> KoreaderCatalog.listSystemActions()
+            else -> emptyList()
+        }
+        if (catalog.isEmpty()) {
+            Toast.makeText(this, R.string.catalog_empty, Toast.LENGTH_SHORT).show()
+            commitDesktopShortcut(
+                DesktopItem(
+                    id = LauncherPrefs.newId(),
+                    type = "shortcut",
+                    label = type.label,
+                    actionType = type.id,
+                    iconKey = iconKey,
+                ),
+            )
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(type.label)
+            .setItems(catalog.map { it.title }.toTypedArray()) { _, which ->
+                val item = catalog[which]
+                commitDesktopShortcut(
+                    DesktopItem(
+                        id = LauncherPrefs.newId(),
+                        type = "shortcut",
+                        label = item.title,
+                        actionType = type.id,
+                        param = item.param,
+                        param2 = item.param2,
+                        iconKey = item.suggestedIcon ?: iconKey,
+                    ),
+                )
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun commitDesktopShortcut(item: DesktopItem) {
+        val items = launcherPrefs.getDesktopItems().toMutableList()
+        val withCell = if (item.cellIndex >= 0) item
+        else item.copy(cellIndex = launcherPrefs.nextFreeCellIndex())
+        items.add(withCell)
+        launcherPrefs.setDesktopItems(items)
+        refreshDesktop()
+        Toast.makeText(this, R.string.shortcut_added, Toast.LENGTH_SHORT).show()
     }
 
     private fun requestAddWidget() {
@@ -589,8 +1032,14 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private class DesktopAdapter(
+        private val iconSizeDp: () -> Int,
+        private val iconBorder: () -> Boolean,
+        private val labelSp: () -> Int,
+        private val moveMode: () -> Boolean,
+        private val resolveOverride: (DesktopItem) -> fr.atelier.koreaderhistory.data.AppIconOverride?,
         private val onClick: (DesktopItem) -> Unit,
         private val onLongClick: (DesktopItem) -> Boolean,
+        private val onMove: (DesktopItem, Int, Int) -> Unit,
     ) : RecyclerView.Adapter<DesktopAdapter.VH>() {
         private var items: List<DesktopItem> = emptyList()
 
@@ -607,29 +1056,115 @@ class HomeActivity : AppCompatActivity() {
         override fun getItemCount(): Int = items.size
 
         override fun onBindViewHolder(holder: VH, position: Int) {
-            holder.bind(items[position], onClick, onLongClick)
+            holder.bind(
+                items[position],
+                iconSizeDp(),
+                iconBorder(),
+                labelSp(),
+                moveMode(),
+                resolveOverride,
+                onClick,
+                onLongClick,
+                onMove,
+            )
         }
 
         class VH(private val binding: ItemDesktopAppBinding) : RecyclerView.ViewHolder(binding.root) {
             fun bind(
                 item: DesktopItem,
+                sizeDp: Int,
+                border: Boolean,
+                labelSp: Int,
+                moveMode: Boolean,
+                resolveOverride: (DesktopItem) -> fr.atelier.koreaderhistory.data.AppIconOverride?,
                 onClick: (DesktopItem) -> Unit,
                 onLongClick: (DesktopItem) -> Boolean,
+                onMove: (DesktopItem, Int, Int) -> Unit,
             ) {
-                binding.appLabel.text = item.label
-                when (item.type) {
-                    "folder" -> binding.appIcon.setImageResource(CoreR.drawable.ic_folder)
-                    "history" -> binding.appIcon.setImageResource(CoreR.drawable.ic_history)
-                    else -> binding.appIcon.setImageDrawable(
-                        AppIconLoader.loadActivityDrawable(
-                            binding.root.context,
-                            item.packageName,
-                            item.activityName,
-                        ) ?: AppIconLoader.loadDrawable(binding.root.context, item.packageName),
-                    )
+                fun showMoves(show: Boolean) {
+                    val v = if (show) View.VISIBLE else View.GONE
+                    binding.btnMoveUp.visibility = v
+                    binding.btnMoveDown.visibility = v
+                    binding.btnMoveLeft.visibility = v
+                    binding.btnMoveRight.visibility = v
                 }
-                binding.root.setOnClickListener { onClick(item) }
-                binding.root.setOnLongClickListener { onLongClick(item) }
+
+                if (item.type == "empty") {
+                    binding.appLabel.text = ""
+                    binding.appIcon.setImageDrawable(null)
+                    binding.appIcon.background = null
+                    binding.root.setOnClickListener(null)
+                    binding.root.setOnLongClickListener(null)
+                    binding.root.isClickable = false
+                    binding.root.alpha = 0f
+                    showMoves(false)
+                    return
+                }
+                binding.root.alpha = 1f
+                binding.root.isClickable = true
+                showMoves(moveMode)
+
+                val sizePx = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    sizeDp.toFloat(),
+                    binding.root.resources.displayMetrics,
+                ).toInt()
+                binding.appIcon.layoutParams = binding.appIcon.layoutParams.apply {
+                    width = sizePx
+                    height = sizePx
+                }
+                if (border) binding.appIcon.setBackgroundResource(R.drawable.dock_button_bg)
+                else binding.appIcon.background = null
+
+                binding.appLabel.text = item.label
+                binding.appLabel.textSize = labelSp.toFloat()
+                when (item.type) {
+                    "folder" -> {
+                        val custom = (item.iconKey.isNotBlank() && item.iconKey != "app") ||
+                            item.iconPackage.isNotBlank() || item.iconPackPackage.isNotBlank()
+                        if (custom) {
+                            binding.appIcon.setImageDrawable(
+                                DockIconResolver.loadDrawable(binding.root.context, item.toDockSlot()),
+                            )
+                        } else {
+                            binding.appIcon.setImageResource(CoreR.drawable.ic_folder)
+                        }
+                    }
+                    "history" -> binding.appIcon.setImageResource(CoreR.drawable.ic_history)
+                    "shortcut" -> binding.appIcon.setImageDrawable(
+                        DockIconResolver.loadDrawable(binding.root.context, item.toDockSlot()),
+                    )
+                    else -> {
+                        val ov = resolveOverride(item)
+                        if (ov != null) {
+                            binding.appIcon.setImageDrawable(
+                                DockIconResolver.loadDrawable(
+                                    binding.root.context,
+                                    ov.toDockSlot(label = item.label),
+                                ),
+                            )
+                        } else {
+                            binding.appIcon.setImageDrawable(
+                                AppIconLoader.loadActivityDrawable(
+                                    binding.root.context,
+                                    item.packageName,
+                                    item.activityName,
+                                ) ?: AppIconLoader.loadDrawable(binding.root.context, item.packageName),
+                            )
+                        }
+                    }
+                }
+                if (moveMode) {
+                    binding.btnMoveLeft.setOnClickListener { onMove(item, -1, 0) }
+                    binding.btnMoveRight.setOnClickListener { onMove(item, 1, 0) }
+                    binding.btnMoveUp.setOnClickListener { onMove(item, 0, -1) }
+                    binding.btnMoveDown.setOnClickListener { onMove(item, 0, 1) }
+                    binding.root.setOnClickListener(null)
+                    binding.root.setOnLongClickListener(null)
+                } else {
+                    binding.root.setOnClickListener { onClick(item) }
+                    binding.root.setOnLongClickListener { onLongClick(item) }
+                }
             }
         }
     }

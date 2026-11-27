@@ -48,6 +48,11 @@ class WidgetPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_DARK, false)
         set(value) = prefs.edit().putBoolean(KEY_DARK, value).apply()
 
+    /** Afficher le dock du widget (indépendant du dock launcher). */
+    var dockEnabled: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_DOCK_ENABLED, value).apply()
+
     var dockOnTop: Boolean
         get() = prefs.getBoolean(KEY_DOCK_TOP, false)
         set(value) = prefs.edit().putBoolean(KEY_DOCK_TOP, value).apply()
@@ -70,30 +75,27 @@ class WidgetPrefs(context: Context) {
         get() = prefs.getString(KEY_DOCK_JUSTIFY, JUSTIFY_CENTER) ?: JUSTIFY_CENTER
         set(value) = prefs.edit().putString(KEY_DOCK_JUSTIFY, value).apply()
 
-    fun getDockSlots(): List<DockSlot> {
+    /**
+     * Garantit des slots persistés avec IDs stables.
+     * Absents ou liste vide → écrit [defaultDock] une fois.
+     */
+    fun ensureDockSlots(): List<DockSlot> {
         val raw = prefs.getString(KEY_DOCK, null)
-        if (raw.isNullOrBlank()) return defaultDock()
-        return runCatching {
-            val arr = JSONArray(raw)
-            buildList {
-                for (i in 0 until arr.length()) {
-                    val o = arr.getJSONObject(i)
-                    add(
-                        DockSlot(
-                            id = o.getString("id"),
-                            label = o.optString("label", ""),
-                            iconKey = o.optString("iconKey", "history"),
-                            actionType = DockActionType.fromId(o.optString("actionType", "history")),
-                            param = o.optString("param", ""),
-                            param2 = o.optString("param2", ""),
-                            iconPackage = o.optString("iconPackage", ""),
-                            iconPackPackage = o.optString("iconPackPackage", ""),
-                            iconDrawableName = o.optString("iconDrawableName", ""),
-                        )
-                    )
-                }
-            }
-        }.getOrElse { defaultDock() }
+        if (!raw.isNullOrBlank()) {
+            val parsed = parseDockSlots(raw)
+            if (parsed != null && parsed.isNotEmpty()) return parsed
+        }
+        val defaults = defaultDock()
+        setDockSlots(defaults)
+        return defaults
+    }
+
+    fun getDockSlots(): List<DockSlot> = ensureDockSlots()
+
+    fun restoreDefaultDock(): List<DockSlot> {
+        val defaults = defaultDock()
+        setDockSlots(defaults)
+        return defaults
     }
 
     fun setDockSlots(slots: List<DockSlot>) {
@@ -123,7 +125,37 @@ class WidgetPrefs(context: Context) {
     }
 
     fun removeDockSlot(id: String) {
-        setDockSlots(getDockSlots().filterNot { it.id == id })
+        val remaining = getDockSlots().filterNot { it.id == id }
+        // Liste vide → reseed (dock optionnel mais utile ; dockEnabled contrôle la visibilité)
+        if (remaining.isEmpty()) {
+            restoreDefaultDock()
+        } else {
+            setDockSlots(remaining)
+        }
+    }
+
+    private fun parseDockSlots(raw: String): List<DockSlot>? {
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    add(
+                        DockSlot(
+                            id = o.getString("id"),
+                            label = o.optString("label", ""),
+                            iconKey = o.optString("iconKey", "history"),
+                            actionType = DockActionType.fromId(o.optString("actionType", "history")),
+                            param = o.optString("param", ""),
+                            param2 = o.optString("param2", ""),
+                            iconPackage = o.optString("iconPackage", ""),
+                            iconPackPackage = o.optString("iconPackPackage", ""),
+                            iconDrawableName = o.optString("iconDrawableName", ""),
+                        )
+                    )
+                }
+            }
+        }.getOrNull()
     }
 
     companion object {
@@ -143,6 +175,7 @@ class WidgetPrefs(context: Context) {
         private const val KEY_SHOW_COVER = "show_cover_letter"
         private const val KEY_SHOW_PAGES = "show_pages"
         private const val KEY_DARK = "dark_theme"
+        private const val KEY_DOCK_ENABLED = "dock_enabled"
         private const val KEY_DOCK_TOP = "dock_top"
         private const val KEY_PKG_MODE = "pkg_mode"
         private const val KEY_DOCK_SIZE = "dock_icon_size"

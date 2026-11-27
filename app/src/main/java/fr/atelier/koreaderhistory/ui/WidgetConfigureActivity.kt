@@ -43,6 +43,7 @@ class WidgetConfigureActivity : AppCompatActivity() {
         binding = ActivityWidgetConfigureBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = WidgetPrefs(this)
+        prefs.ensureDockSlots()
 
         appWidgetId = intent?.getIntExtra(
             AppWidgetManager.EXTRA_APPWIDGET_ID,
@@ -59,6 +60,7 @@ class WidgetConfigureActivity : AppCompatActivity() {
         binding.checkShowCover.isChecked = prefs.showCoverLetter
         binding.checkShowPages.isChecked = prefs.showPages
         binding.checkDark.isChecked = prefs.darkTheme
+        binding.checkDockEnabled.isChecked = prefs.dockEnabled
         binding.checkDockTop.isChecked = prefs.dockOnTop
         binding.checkDockBorder.isChecked = prefs.dockIconBorder
 
@@ -93,7 +95,11 @@ class WidgetConfigureActivity : AppCompatActivity() {
         )
 
         binding.btnEditDock.setOnClickListener {
+            prefs.ensureDockSlots()
             startActivity(Intent(this, DockEditorActivity::class.java))
+        }
+        if (prefs.dockEnabled && prefs.getDockSlots().isEmpty()) {
+            Toast.makeText(this, R.string.dock_empty_hint, Toast.LENGTH_LONG).show()
         }
         binding.btnInstallBridge.setOnClickListener {
             BridgeInstaller.install(this, prefs).fold(
@@ -119,6 +125,7 @@ class WidgetConfigureActivity : AppCompatActivity() {
         prefs.showCoverLetter = binding.checkShowCover.isChecked
         prefs.showPages = binding.checkShowPages.isChecked
         prefs.darkTheme = binding.checkDark.isChecked
+        prefs.dockEnabled = binding.checkDockEnabled.isChecked
         prefs.dockOnTop = binding.checkDockTop.isChecked
         prefs.dockIconBorder = binding.checkDockBorder.isChecked
         prefs.dockJustify = listOf(

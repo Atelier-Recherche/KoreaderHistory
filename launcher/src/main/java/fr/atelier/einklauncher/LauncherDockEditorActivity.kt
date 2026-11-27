@@ -1,23 +1,28 @@
 package fr.atelier.einklauncher
 
+import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.button.MaterialButton
 import fr.atelier.einklauncher.databinding.ItemDesktopAppBinding
 import fr.atelier.koreaderhistory.data.AppIconLoader
+import fr.atelier.koreaderhistory.data.AppIconOverride
 import fr.atelier.koreaderhistory.data.DockActionType
 import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.DockSlot
@@ -25,12 +30,34 @@ import fr.atelier.koreaderhistory.data.LauncherPrefs
 
 class LauncherDockEditorActivity : AppCompatActivity() {
     private lateinit var prefs: LauncherPrefs
-    private lateinit var adapter: Adapter
+    private lateinit var listAdapter: Adapter
     private lateinit var sizeSpinner: Spinner
+    private lateinit var enabledCheck: CheckBox
     private lateinit var borderCheck: CheckBox
     private lateinit var justifySpinner: Spinner
+    private lateinit var statusView: TextView
+    private var suppressAutoSave = true
+    private var pendingBuiltin: BuiltinIconTarget = BuiltinIconTarget.APPS
     private val sizes = listOf(32, 44, 48, 56, 72)
     private val justifyModes = listOf(LauncherPrefs.JUSTIFY_CENTER, LauncherPrefs.JUSTIFY_SPACE_BETWEEN)
+
+    private enum class BuiltinIconTarget { APPS, NOTIFS }
+
+    private val pickBuiltinIcon = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        val data = result.data ?: return@registerForActivityResult
+        val override = AppIconOverride(
+            iconKey = data.getStringExtra(IconPickerActivity.EXTRA_ICON_KEY) ?: "app",
+            iconPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACKAGE).orEmpty(),
+            iconPackPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACK).orEmpty(),
+            iconDrawableName = data.getStringExtra(IconPickerActivity.EXTRA_ICON_DRAWABLE).orEmpty(),
+        )
+        when (pendingBuiltin) {
+            BuiltinIconTarget.APPS -> prefs.setDockAppsIcon(override)
+            BuiltinIconTarget.NOTIFS -> prefs.setDockNotifsIcon(override)
+        }
+        Toast.makeText(this, R.string.choose_icon, Toast.LENGTH_SHORT).show()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,47 +79,68 @@ class LauncherDockEditorActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(12))
         })
 
+        enabledCheck = CheckBox(this).apply {
+            text = getString(R.string.dock_enabled_launcher)
+            setTextColor(0xFF000000.toInt())
+        }
+        header.addView(enabledCheck)
+
         sizeSpinner = Spinner(this).apply {
-            adapter = ArrayAdapter(
+            this.adapter = ArrayAdapter(
                 this@LauncherDockEditorActivity,
                 android.R.layout.simple_spinner_dropdown_item,
                 sizes.map { "${it}dp" },
             )
-            setSelection(sizes.indexOf(prefs.dockIconSizeDp).let { if (it >= 0) it else 2 })
         }
-        header.addView(TextView(this).apply {
-            text = getString(R.string.dock_icon_size)
-            setTextColor(0xFF000000.toInt())
-        })
+        header.addView(label(getString(R.string.dock_icon_size)))
         header.addView(sizeSpinner)
 
         borderCheck = CheckBox(this).apply {
             text = getString(R.string.dock_icon_border)
             setTextColor(0xFF000000.toInt())
-            isChecked = prefs.dockIconBorder
         }
         header.addView(borderCheck)
 
         justifySpinner = Spinner(this).apply {
-            adapter = ArrayAdapter(
+            this.adapter = ArrayAdapter(
                 this@LauncherDockEditorActivity,
                 android.R.layout.simple_spinner_dropdown_item,
                 listOf(getString(R.string.dock_justify_center), getString(R.string.dock_justify_space)),
             )
-            setSelection(justifyModes.indexOf(prefs.dockJustify).coerceAtLeast(0))
         }
-        header.addView(TextView(this).apply {
-            text = getString(R.string.dock_justify)
-            setTextColor(0xFF000000.toInt())
-        })
+        header.addView(label(getString(R.string.dock_justify)))
         header.addView(justifySpinner)
 
-        header.addView(
-            MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text = getString(R.string.save_dock_options)
-                setOnClickListener { saveOptions(finishAfter = true) }
-            },
-        )
+        statusView = TextView(this).apply {
+            setTextColor(0xFF444444.toInt())
+            textSize = 12f
+            setPadding(0, dp(8), 0, dp(4))
+        }
+        header.addView(statusView)
+
+        header.addView(Button(this).apply {
+            text = getString(R.string.dock_apps_icon)
+            setOnClickListener {
+                pendingBuiltin = BuiltinIconTarget.APPS
+                pickBuiltinIcon.launch(Intent(this@LauncherDockEditorActivity, IconPickerActivity::class.java))
+            }
+        })
+        header.addView(Button(this).apply {
+            text = getString(R.string.dock_notifs_icon)
+            setOnClickListener {
+                pendingBuiltin = BuiltinIconTarget.NOTIFS
+                pickBuiltinIcon.launch(Intent(this@LauncherDockEditorActivity, IconPickerActivity::class.java))
+            }
+        })
+
+        header.addView(Button(this).apply {
+            text = getString(R.string.save_dock_options)
+            setOnClickListener { persistOptions(showToast = true, finishAfter = true) }
+        })
+        header.addView(Button(this).apply {
+            text = getString(android.R.string.cancel)
+            setOnClickListener { finish() }
+        })
         root.addView(header)
 
         val list = RecyclerView(this).apply {
@@ -100,7 +148,7 @@ class LauncherDockEditorActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@LauncherDockEditorActivity)
             setPadding(dp(8), 0, dp(8), 0)
         }
-        adapter = Adapter(
+        listAdapter = Adapter(
             onClick = { slot ->
                 startActivity(
                     Intent(this, LauncherDockSlotEditActivity::class.java)
@@ -109,45 +157,90 @@ class LauncherDockEditorActivity : AppCompatActivity() {
             },
             onDelete = { slot ->
                 prefs.removeDockSlot(slot.id)
-                reload()
+                reloadSlots()
             },
         )
-        list.adapter = adapter
+        list.adapter = listAdapter
         root.addView(list)
 
-        root.addView(
-            MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                text = getString(R.string.add_dock_item)
-                setOnClickListener { showAddMenu() }
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).also { it.setMargins(dp(16), dp(8), dp(16), dp(16)) }
-            },
-        )
+        root.addView(Button(this).apply {
+            text = getString(R.string.add_dock_item)
+            setOnClickListener { showAddMenu() }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).also { it.setMargins(dp(16), dp(8), dp(16), dp(16)) }
+        })
 
         setContentView(root)
-        reload()
+        bindFromPrefs()
+        wireAutoSave()
+        reloadSlots()
+        suppressAutoSave = false
     }
 
     override fun onResume() {
         super.onResume()
-        reload()
+        reloadSlots()
+        statusView.text = "Actuel : ${prefs.readDockVisualDebug()}"
     }
 
-    private fun saveOptions(finishAfter: Boolean) {
-        prefs.dockIconSizeDp = sizes.getOrElse(sizeSpinner.selectedItemPosition) { 48 }
-        prefs.dockIconBorder = borderCheck.isChecked
-        prefs.dockJustify = justifyModes.getOrElse(justifySpinner.selectedItemPosition) {
+    private fun bindFromPrefs() {
+        suppressAutoSave = true
+        enabledCheck.isChecked = prefs.dockEnabled
+        sizeSpinner.setSelection(sizes.indexOf(prefs.dockIconSizeDp).let { if (it >= 0) it else 2 })
+        borderCheck.isChecked = prefs.dockIconBorder
+        justifySpinner.setSelection(justifyModes.indexOf(prefs.dockJustify).coerceAtLeast(0))
+        statusView.text = "Actuel : ${prefs.readDockVisualDebug()}"
+        suppressAutoSave = false
+    }
+
+    private fun wireAutoSave() {
+        val listener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (!suppressAutoSave) persistOptions(showToast = false, finishAfter = false)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+        sizeSpinner.onItemSelectedListener = listener
+        justifySpinner.onItemSelectedListener = listener
+        val checkListener = { _: android.widget.CompoundButton, _: Boolean ->
+            if (!suppressAutoSave) persistOptions(showToast = false, finishAfter = false)
+        }
+        enabledCheck.setOnCheckedChangeListener(checkListener)
+        borderCheck.setOnCheckedChangeListener(checkListener)
+    }
+
+    private fun persistOptions(showToast: Boolean, finishAfter: Boolean) {
+        val size = sizes.getOrElse(sizeSpinner.selectedItemPosition) { 48 }
+        val border = borderCheck.isChecked
+        val enabled = enabledCheck.isChecked
+        val justify = justifyModes.getOrElse(justifySpinner.selectedItemPosition) {
             LauncherPrefs.JUSTIFY_CENTER
         }
-        // commit synchrone pour éviter une perte si on revient trop vite
-        Toast.makeText(this, R.string.dock_options_saved, Toast.LENGTH_SHORT).show()
-        if (finishAfter) finish()
+        val ok = prefs.saveDockVisualOptions(size, border, justify, enabled)
+        WidgetLog.file(this, "dock visual save ok=$ok → ${prefs.readDockVisualDebug()}")
+        statusView.text = if (ok) {
+            "Enregistré : ${prefs.readDockVisualDebug()}"
+        } else {
+            "Échec sauvegarde prefs"
+        }
+        if (showToast) {
+            Toast.makeText(
+                this,
+                if (ok) getString(R.string.dock_options_saved) + " (${prefs.dockIconSizeDp}dp)"
+                else "Échec sauvegarde",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+        if (finishAfter && ok) {
+            setResult(RESULT_OK)
+            finish()
+        }
     }
 
-    private fun reload() {
-        adapter.submit(prefs.getDockSlots())
+    private fun reloadSlots() {
+        listAdapter.submit(prefs.getDockSlots())
     }
 
     private fun showAddMenu() {
@@ -208,12 +301,16 @@ class LauncherDockEditorActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle(R.string.add_dock_app)
             .setItems(apps.map { it.label }.toTypedArray()) { _, which ->
-                val app = apps[which]
-                prefs.pinAppToDock(app)
-                reload()
+                prefs.pinAppToDock(apps[which])
+                reloadSlots()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    private fun label(text: String): TextView = TextView(this).apply {
+        this.text = text
+        setTextColor(0xFF000000.toInt())
     }
 
     private fun dp(v: Int): Int = TypedValue.applyDimension(

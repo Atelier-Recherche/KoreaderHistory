@@ -27,6 +27,7 @@ class DockEditorActivity : AppCompatActivity() {
         binding = ActivityDockEditorBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = WidgetPrefs(this)
+        prefs.ensureDockSlots()
 
         adapter = DockAdapter { slot ->
             startActivity(
@@ -36,6 +37,13 @@ class DockEditorActivity : AppCompatActivity() {
         }
         binding.dockList.layoutManager = LinearLayoutManager(this)
         binding.dockList.adapter = adapter
+
+        binding.btnRestoreDefaults.setOnClickListener {
+            prefs.restoreDefaultDock()
+            adapter.submit(prefs.getDockSlots())
+            HistoryWidgetProvider.refreshAll(this)
+            Toast.makeText(this, R.string.restore_default_dock, Toast.LENGTH_SHORT).show()
+        }
 
         binding.btnAdd.setOnClickListener {
             if (prefs.getDockSlots().size >= WidgetPrefs.MAX_DOCK_SLOTS) {

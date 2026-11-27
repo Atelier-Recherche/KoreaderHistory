@@ -116,6 +116,13 @@
             android:textColor="@color/eink_fg" />
 
         <CheckBox
+            android:id="@+id/check_dock_enabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dock_enabled"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
             android:id="@+id/check_dock_top"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

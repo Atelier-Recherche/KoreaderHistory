@@ -8,9 +8,12 @@ import android.provider.Settings
 import android.widget.Toast
 
 /**
- * Sur Boox, App Freeze désactive les packages (enabled=DISABLED_USER).
- * Une app tierce ne peut en général pas les réactiver sans Shizuku/root :
- * on tente quand même, puis on oriente vers l’écran Freeze Boox.
+ * Sur Boox, App Freeze désactive les packages (DISABLED_USER).
+ *
+ * Il n’existe **pas** d’API publique pour dégeler depuis une app tierce :
+ * le launcher stock Onyx est privilégié ; BooxUltimatum utilise Shizuku (`pm enable`).
+ * Ici on tente `setApplicationEnabledSetting` (échoue en général), puis on ouvre
+ * l’écran officiel `onyx.settings.action.APP_FREEZE_MANAGEMENT`.
  */
 object BooxFreezeHelper {
 
@@ -44,6 +47,16 @@ object BooxFreezeHelper {
 
     fun tryUnfreeze(context: Context, packageName: String): Boolean {
         AppIconLoader.ensureEnabled(context, packageName)
+        // Tentative via service OEC (échoue sans privilege — best effort)
+        runCatching {
+            context.startService(
+                Intent("android.intent.action.EAC_SERVICE")
+                    .setPackage("com.onyx")
+                    .putExtra("package", packageName)
+                    .putExtra("pkg", packageName)
+                    .putExtra("autoFreeze", false),
+            )
+        }
         return !isFrozen(context, packageName)
     }
 
@@ -76,7 +89,7 @@ object BooxFreezeHelper {
     fun toastFrozen(context: Context, label: String) {
         Toast.makeText(
             context,
-            "$label est gelée (Boox App Freeze). Dégèle-la puis réessaie.",
+            "$label est gelée. Dégèle-la dans App Freeze Boox (pas d’API publique pour le faire automatiquement).",
             Toast.LENGTH_LONG,
         ).show()
         openFreezeSettings(context)

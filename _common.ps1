@@ -236,3 +236,84 @@ function Push-KoreaderPlugin {
         $ErrorActionPreference = $prevEap
     }
 }
+
+function Grant-EinkPermissions {
+    <#
+    .SYNOPSIS
+      Grants ADB permissions for launcher + widget (notif listener, a11y, usage, storage).
+      Failures are warnings only — deploy continues.
+    #>
+    param(
+        [string[]]$AdbPrefix = @()
+    )
+    $launcherPkg = 'fr.atelier.einklauncher'
+    $widgetPkg = 'fr.atelier.koreaderhistory'
+    $notifComponent = "$launcherPkg/fr.atelier.einklauncher.EinkNotificationListener"
+    $a11yComponent = "$launcherPkg/fr.atelier.einklauncher.HotkeyAccessibilityService"
+
+    Write-Host '==> Grant permissions (ADB)' -ForegroundColor Cyan
+
+    function Invoke-Grant {
+        param(
+            [Parameter(Mandatory)][string]$Label,
+            [Parameter(Mandatory)][scriptblock]$Action
+        )
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            & $Action
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "    OK  $Label" -ForegroundColor Green
+            } else {
+                Write-Host "    WARN $Label (code $LASTEXITCODE)" -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host "    WARN $Label : $_" -ForegroundColor Yellow
+        } finally {
+            $ErrorActionPreference = $prevEap
+        }
+    }
+
+    # Notification listener — merge component into enabled_notification_listeners
+    Invoke-Grant -Label 'notification listener' -Action {
+        $cur = (& adb @AdbPrefix shell settings get secure enabled_notification_listeners 2>$null | Out-String).Trim()
+        if ($cur -eq 'null' -or $cur -eq '') { $cur = '' }
+        $parts = [System.Collections.Generic.List[string]]@(
+            $cur -split ':' | Where-Object { $_ -and $_.Trim().Length -gt 0 }
+        )
+        if (-not $parts.Contains($notifComponent)) { $parts.Add($notifComponent) }
+        $merged = ($parts -join ':')
+        & adb @AdbPrefix shell settings put secure enabled_notification_listeners $merged | Out-Null
+    }
+
+    # Accessibility — merge + enable (best-effort on Boox)
+    Invoke-Grant -Label 'accessibility service' -Action {
+        $cur = (& adb @AdbPrefix shell settings get secure enabled_accessibility_services 2>$null | Out-String).Trim()
+        if ($cur -eq 'null' -or $cur -eq '') { $cur = '' }
+        $parts = [System.Collections.Generic.List[string]]@(
+            $cur -split ':' | Where-Object { $_ -and $_.Trim().Length -gt 0 }
+        )
+        if (-not $parts.Contains($a11yComponent)) { $parts.Add($a11yComponent) }
+        $merged = ($parts -join ':')
+        & adb @AdbPrefix shell settings put secure enabled_accessibility_services $merged | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            & adb @AdbPrefix shell settings put secure accessibility_enabled 1 | Out-Null
+        }
+    }
+
+    # Usage stats
+    Invoke-Grant -Label "usage stats ($launcherPkg)" -Action {
+        & adb @AdbPrefix shell appops set $launcherPkg GET_USAGE_STATS allow | Out-Null
+    }
+
+    # Storage (MANAGE_EXTERNAL_STORAGE) — launcher + widget
+    foreach ($pkg in @($launcherPkg, $widgetPkg)) {
+        $target = $pkg
+        Invoke-Grant -Label "storage MANAGE_EXTERNAL_STORAGE ($target)" -Action {
+            & adb @AdbPrefix shell appops set $target MANAGE_EXTERNAL_STORAGE allow | Out-Null
+        }
+        Invoke-Grant -Label "pm grant READ_EXTERNAL_STORAGE ($target)" -Action {
+            & adb @AdbPrefix shell pm grant $target android.permission.READ_EXTERNAL_STORAGE | Out-Null
+        }
+    }
+}

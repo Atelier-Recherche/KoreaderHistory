@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.Toast
@@ -16,8 +17,10 @@ import androidx.recyclerview.widget.RecyclerView
 import fr.atelier.einklauncher.databinding.ActivityAppDrawerBinding
 import fr.atelier.einklauncher.databinding.ItemDesktopAppBinding
 import fr.atelier.koreaderhistory.data.AppIconLoader
+import fr.atelier.koreaderhistory.data.AppIconOverride
 import fr.atelier.koreaderhistory.data.BooxFreezeHelper
 import fr.atelier.koreaderhistory.data.DesktopItem
+import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.KoreaderLauncher
 import fr.atelier.koreaderhistory.data.LauncherApp
 import fr.atelier.koreaderhistory.data.LauncherPrefs
@@ -28,24 +31,44 @@ class AppDrawerActivity : AppCompatActivity() {
     private lateinit var adapter: AppAdapter
     private var allApps: List<LauncherApp> = emptyList()
     private var pendingIconApp: LauncherApp? = null
+    private var pendingIconMode: IconMode = IconMode.OVERRIDE
+
+    private enum class IconMode { OVERRIDE, PIN_DOCK }
 
     private val pickIcon = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val app = pendingIconApp ?: return@registerForActivityResult
         pendingIconApp = null
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
         val data = result.data ?: return@registerForActivityResult
-        val ok = prefs.pinAppToDock(
-            app,
-            iconPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACKAGE).orEmpty().ifBlank { app.packageName },
+        val override = AppIconOverride(
             iconKey = data.getStringExtra(IconPickerActivity.EXTRA_ICON_KEY) ?: "app",
+            iconPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACKAGE).orEmpty()
+                .ifBlank { app.packageName },
             iconPackPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACK).orEmpty(),
             iconDrawableName = data.getStringExtra(IconPickerActivity.EXTRA_ICON_DRAWABLE).orEmpty(),
         )
-        Toast.makeText(
-            this,
-            if (ok) getString(R.string.pinned_to_dock) else getString(R.string.dock_max_slots, LauncherPrefs.MAX_DOCK_SLOTS),
-            Toast.LENGTH_SHORT,
-        ).show()
+        when (pendingIconMode) {
+            IconMode.OVERRIDE -> {
+                prefs.setAppIconOverride(app.componentKey, override)
+                applyFilter()
+                Toast.makeText(this, R.string.choose_icon, Toast.LENGTH_SHORT).show()
+            }
+            IconMode.PIN_DOCK -> {
+                val ok = prefs.pinAppToDock(
+                    app,
+                    iconPackage = override.iconPackage.ifBlank { app.packageName },
+                    iconKey = override.iconKey,
+                    iconPackPackage = override.iconPackPackage,
+                    iconDrawableName = override.iconDrawableName,
+                )
+                Toast.makeText(
+                    this,
+                    if (ok) getString(R.string.pinned_to_dock)
+                    else getString(R.string.dock_max_slots, LauncherPrefs.MAX_DOCK_SLOTS),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,10 +78,14 @@ class AppDrawerActivity : AppCompatActivity() {
         prefs = LauncherPrefs(this)
 
         adapter = AppAdapter(
+            iconSizeDp = { prefs.drawerIconSizeDp },
+            iconBorder = { prefs.drawerIconBorder },
+            labelSp = { prefs.drawerLabelSp },
+            resolveOverride = { app -> prefs.getAppIconOverride(app.componentKey) },
             onClick = { app -> launchApp(app) },
             onLongClick = { app -> showAppMenu(app); true },
         )
-        binding.appGrid.layoutManager = GridLayoutManager(this, 4)
+        binding.appGrid.layoutManager = GridLayoutManager(this, prefs.drawerColumns)
         binding.appGrid.adapter = adapter
         binding.inputSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -69,6 +96,12 @@ class AppDrawerActivity : AppCompatActivity() {
         allApps = AppIconLoader.listLauncherApps(this)
         val frozen = allApps.count { BooxFreezeHelper.isFrozen(this, it.packageName) }
         WidgetLog.file(this, "AppDrawer apps=${allApps.size} frozen=$frozen")
+        applyFilter()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (binding.appGrid.layoutManager as? GridLayoutManager)?.spanCount = prefs.drawerColumns
         applyFilter()
     }
 
@@ -93,9 +126,10 @@ class AppDrawerActivity : AppCompatActivity() {
 
     private fun applyFilter() {
         val q = binding.inputSearch.text?.toString()?.trim()?.lowercase().orEmpty()
+        val visible = allApps.filter { !prefs.isAppHidden(it.componentKey) }
         adapter.submit(
-            if (q.isBlank()) allApps
-            else allApps.filter {
+            if (q.isBlank()) visible
+            else visible.filter {
                 it.label.lowercase().contains(q) ||
                     it.packageName.lowercase().contains(q) ||
                     it.activityName.lowercase().contains(q)
@@ -108,6 +142,8 @@ class AppDrawerActivity : AppCompatActivity() {
         val options = arrayOf(
             if (docked) getString(R.string.launcher_unpin_dock) else getString(R.string.launcher_pin_dock),
             getString(R.string.pin_dock_with_icon),
+            getString(R.string.choose_icon),
+            getString(R.string.hide_app),
             getString(R.string.add_to_desktop),
             getString(R.string.add_to_folder),
         )
@@ -131,10 +167,21 @@ class AppDrawerActivity : AppCompatActivity() {
                     }
                     1 -> {
                         pendingIconApp = app
+                        pendingIconMode = IconMode.PIN_DOCK
                         pickIcon.launch(Intent(this, IconPickerActivity::class.java))
                     }
-                    2 -> addToDesktop(app)
-                    3 -> addToFolder(app)
+                    2 -> {
+                        pendingIconApp = app
+                        pendingIconMode = IconMode.OVERRIDE
+                        pickIcon.launch(Intent(this, IconPickerActivity::class.java))
+                    }
+                    3 -> {
+                        prefs.hideApp(app.componentKey)
+                        applyFilter()
+                        Toast.makeText(this, R.string.hide_app, Toast.LENGTH_SHORT).show()
+                    }
+                    4 -> addToDesktop(app)
+                    5 -> addToFolder(app)
                 }
             }
             .show()
@@ -153,6 +200,7 @@ class AppDrawerActivity : AppCompatActivity() {
                 label = app.label,
                 packageName = app.packageName,
                 activityName = app.activityName,
+                cellIndex = prefs.nextFreeCellIndex(),
             ),
         )
         prefs.setDesktopItems(items)
@@ -183,6 +231,10 @@ class AppDrawerActivity : AppCompatActivity() {
     }
 
     private class AppAdapter(
+        private val iconSizeDp: () -> Int,
+        private val iconBorder: () -> Boolean,
+        private val labelSp: () -> Int,
+        private val resolveOverride: (LauncherApp) -> AppIconOverride?,
         private val onClick: (LauncherApp) -> Unit,
         private val onLongClick: (LauncherApp) -> Boolean,
     ) : RecyclerView.Adapter<AppAdapter.VH>() {
@@ -201,22 +253,57 @@ class AppDrawerActivity : AppCompatActivity() {
         override fun getItemCount(): Int = items.size
 
         override fun onBindViewHolder(holder: VH, position: Int) {
-            holder.bind(items[position], onClick, onLongClick)
+            holder.bind(
+                items[position],
+                iconSizeDp(),
+                iconBorder(),
+                labelSp(),
+                resolveOverride,
+                onClick,
+                onLongClick,
+            )
         }
 
         class VH(private val binding: ItemDesktopAppBinding) : RecyclerView.ViewHolder(binding.root) {
             fun bind(
                 app: LauncherApp,
+                sizeDp: Int,
+                border: Boolean,
+                labelSp: Int,
+                resolveOverride: (LauncherApp) -> AppIconOverride?,
                 onClick: (LauncherApp) -> Unit,
                 onLongClick: (LauncherApp) -> Boolean,
             ) {
+                val sizePx = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    sizeDp.toFloat(),
+                    binding.root.resources.displayMetrics,
+                ).toInt()
+                binding.appIcon.layoutParams = binding.appIcon.layoutParams.apply {
+                    width = sizePx
+                    height = sizePx
+                }
+                if (border) binding.appIcon.setBackgroundResource(R.drawable.dock_button_bg)
+                else binding.appIcon.background = null
+
                 val frozen = BooxFreezeHelper.isFrozen(binding.root.context, app.packageName)
                 binding.appLabel.text = if (frozen) "❄ ${app.label}" else app.label
+                binding.appLabel.textSize = labelSp.toFloat()
                 binding.root.alpha = if (frozen) 0.55f else 1f
-                binding.appIcon.setImageDrawable(
-                    AppIconLoader.loadActivityDrawable(binding.root.context, app.packageName, app.activityName)
-                        ?: AppIconLoader.loadDrawable(binding.root.context, app.packageName),
-                )
+                val ov = resolveOverride(app)
+                if (ov != null) {
+                    binding.appIcon.setImageDrawable(
+                        DockIconResolver.loadDrawable(
+                            binding.root.context,
+                            ov.toDockSlot(label = app.label),
+                        ),
+                    )
+                } else {
+                    binding.appIcon.setImageDrawable(
+                        AppIconLoader.loadActivityDrawable(binding.root.context, app.packageName, app.activityName)
+                            ?: AppIconLoader.loadDrawable(binding.root.context, app.packageName),
+                    )
+                }
                 binding.root.setOnClickListener { onClick(app) }
                 binding.root.setOnLongClickListener { onLongClick(app) }
             }
