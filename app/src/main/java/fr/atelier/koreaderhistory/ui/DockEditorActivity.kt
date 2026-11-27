@@ -8,10 +8,10 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import fr.atelier.koreaderhistory.data.AppIconLoader
+import fr.atelier.koreaderhistory.R
 import fr.atelier.koreaderhistory.data.DockActionType
+import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.DockSlot
-import fr.atelier.koreaderhistory.data.IconCatalog
 import fr.atelier.koreaderhistory.data.WidgetPrefs
 import fr.atelier.koreaderhistory.databinding.ActivityDockEditorBinding
 import fr.atelier.koreaderhistory.databinding.ItemDockSlotBinding
@@ -38,8 +38,12 @@ class DockEditorActivity : AppCompatActivity() {
         binding.dockList.adapter = adapter
 
         binding.btnAdd.setOnClickListener {
-            if (prefs.getDockSlots().size >= 6) {
-                Toast.makeText(this, "Maximum 6 icônes", Toast.LENGTH_SHORT).show()
+            if (prefs.getDockSlots().size >= WidgetPrefs.MAX_DOCK_SLOTS) {
+                Toast.makeText(
+                    this,
+                    getString(R.string.dock_max_slots, WidgetPrefs.MAX_DOCK_SLOTS),
+                    Toast.LENGTH_SHORT,
+                ).show()
                 return@setOnClickListener
             }
             val slot = DockSlot(
@@ -90,12 +94,9 @@ class DockEditorActivity : AppCompatActivity() {
                     append(slot.actionType.label)
                     if (slot.param.isNotBlank()) append(" — ").append(slot.param)
                 }
-                val appIcon = AppIconLoader.loadDrawable(binding.root.context, slot.iconPackage)
-                if (appIcon != null) {
-                    binding.slotIcon.setImageDrawable(appIcon)
-                } else {
-                    binding.slotIcon.setImageResource(IconCatalog.resId(slot.iconKey))
-                }
+                binding.slotIcon.setImageDrawable(
+                    DockIconResolver.loadDrawable(binding.root.context, slot)
+                )
                 binding.root.setOnClickListener { onClick(slot) }
             }
         }

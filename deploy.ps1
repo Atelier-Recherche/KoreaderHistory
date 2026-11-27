@@ -1,14 +1,16 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 <#
 .SYNOPSIS
-  Installe l'APK debug + pousse athistory.koplugin via ADB.
-  Ne rebuild que si l'APK est absent, ou avec -Force.
+  Build + install les 2 apps (widget History + launcher e-ink), pousse le plugin KOReader.
 #>
 param(
     [string]$AdbDevice = '',
     [string]$KoreaderPath = '/storage/emulated/0/koreader',
+    [string]$RemoteApkDir = '/sdcard/Download/AtelierKOReaderHistory',
+    [ValidateSet('Debug', 'Release')][string]$Variant = 'Debug',
     [switch]$Force,
-    [switch]$SkipPlugin
+    [switch]$SkipPlugin,
+    [switch]$SkipInstall
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -54,22 +56,57 @@ if ($AdbDevice) {
     $prefix = @()
 }
 
-$apkPath = Get-ApkOutputPath -Root $Root -Variant Debug
-$mustBuild = $Force -or -not (Test-Path $apkPath)
-if ($mustBuild) {
-    $buildArgs = @{ Variant = 'Debug'; Force = $true }
-    & (Join-Path $Root 'build.ps1') @buildArgs
+$synced = [bool](Sync-BridgeAssets -Root $Root)
+$needWidget = $Force -or $synced -or (Test-ApkNeedsRebuild -Root $Root -Module app -Variant $Variant)
+$needLauncher = $Force -or (Test-ApkNeedsRebuild -Root $Root -Module launcher -Variant $Variant)
+
+if ($needWidget -or $needLauncher) {
+    Write-Host "==> Build :app + :launcher ($Variant)" -ForegroundColor Cyan
+    $tasks = if ($Variant -eq 'Release') {
+        @(':app:assembleRelease', ':launcher:assembleRelease')
+    } else {
+        @(':app:assembleDebug', ':launcher:assembleDebug')
+    }
+    Invoke-Gradle -Root $Root -GradleArgs $tasks
 } else {
-    Write-Host "==> APK present, skip build (utilise -Force pour reconstruire)" -ForegroundColor DarkGray
+    Write-Host "==> APKs a jour, skip build (utilise -Force pour reconstruire)" -ForegroundColor DarkGray
 }
 
-$apk = Get-DebugApkPath -Root $Root
-Write-Host "==> adb install -r $apk" -ForegroundColor Cyan
-$code = Invoke-AdbQuiet -AdbCmd ($prefix + @('install', '-r', $apk))
-if ($code -ne 0) { throw "adb install a echoue (code $code)" }
+$widgetApk = Get-ModuleApkPath -Root $Root -Module app -Variant $Variant
+$launcherApk = Get-ModuleApkPath -Root $Root -Module launcher -Variant $Variant
+$widgetVer = Get-ModuleVersionName -Root $Root -Module app
+$launcherVer = Get-ModuleVersionName -Root $Root -Module launcher
+$suffix = $Variant.ToLowerInvariant()
+
+$remoteWidget = ($RemoteApkDir.TrimEnd('/') + "/KOReaderHistory-$widgetVer-$suffix.apk")
+$remoteLauncher = ($RemoteApkDir.TrimEnd('/') + "/EinkLauncher-$launcherVer-$suffix.apk")
+
+Write-Host "==> adb mkdir $RemoteApkDir" -ForegroundColor Cyan
+$code = Invoke-AdbQuiet -AdbCmd ($prefix + @('shell', 'mkdir', '-p', $RemoteApkDir))
+if ($code -ne 0) { throw "adb mkdir a echoue (code $code)" }
+
+Write-Host "==> adb push widget -> $remoteWidget" -ForegroundColor Cyan
+$code = Invoke-AdbQuiet -AdbCmd ($prefix + @('push', $widgetApk, $remoteWidget))
+if ($code -ne 0) { throw "adb push widget a echoue (code $code)" }
+
+Write-Host "==> adb push launcher -> $remoteLauncher" -ForegroundColor Cyan
+$code = Invoke-AdbQuiet -AdbCmd ($prefix + @('push', $launcherApk, $remoteLauncher))
+if ($code -ne 0) { throw "adb push launcher a echoue (code $code)" }
+
+if (-not $SkipInstall) {
+    Write-Host "==> adb install -r widget $widgetApk" -ForegroundColor Cyan
+    $code = Invoke-AdbQuiet -AdbCmd ($prefix + @('install', '-r', $widgetApk))
+    if ($code -ne 0) { throw "adb install widget a echoue (code $code)" }
+
+    Write-Host "==> adb install -r launcher $launcherApk" -ForegroundColor Cyan
+    $code = Invoke-AdbQuiet -AdbCmd ($prefix + @('install', '-r', $launcherApk))
+    if ($code -ne 0) { throw "adb install launcher a echoue (code $code)" }
+}
 
 if (-not $SkipPlugin) {
     Push-KoreaderPlugin -Root $Root -AdbArgs $prefix -KoreaderPath $KoreaderPath
 }
 
-Write-Host '==> Deploy OK (APK + plugin KOReader)' -ForegroundColor Green
+Write-Host '==> Deploy OK — 2 APKs (widget + launcher)' -ForegroundColor Green
+Write-Host "    $remoteWidget" -ForegroundColor DarkGray
+Write-Host "    $remoteLauncher" -ForegroundColor DarkGray

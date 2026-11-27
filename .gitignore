@@ -6,6 +6,8 @@
 .DS_Store
 /build/
 /app/build/
+/launcher/build/
+/core/build/
 /captures/
 .externalNativeBuild/
 .cxx/
@@ -14,5 +16,6 @@
 *.dex
 *.zip
 VERSION
-_stage_release/
+dist/
+_stage_*/
 old/

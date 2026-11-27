@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/eink_bg"
+    android:orientation="vertical"
+    android:paddingTop="48dp"
+    android:paddingHorizontal="12dp"
+    android:paddingBottom="12dp">
+
+    <EditText
+        android:id="@+id/input_query"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/run_launcher_hint"
+        android:imeOptions="actionGo"
+        android:inputType="text"
+        android:minHeight="48dp"
+        android:textColor="@color/eink_fg"
+        android:textColorHint="@color/eink_muted"
+        android:textSize="18sp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/results"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_weight="1" />
+</LinearLayout>

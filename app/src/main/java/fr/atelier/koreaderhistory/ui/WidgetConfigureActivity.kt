@@ -60,6 +60,21 @@ class WidgetConfigureActivity : AppCompatActivity() {
         binding.checkShowPages.isChecked = prefs.showPages
         binding.checkDark.isChecked = prefs.darkTheme
         binding.checkDockTop.isChecked = prefs.dockOnTop
+        binding.checkDockBorder.isChecked = prefs.dockIconBorder
+
+        val justifyModes = listOf(WidgetPrefs.JUSTIFY_CENTER, WidgetPrefs.JUSTIFY_SPACE_BETWEEN)
+        val justifyLabels = listOf(
+            getString(R.string.dock_justify_center),
+            getString(R.string.dock_justify_space),
+        )
+        binding.spinnerDockJustify.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            justifyLabels
+        )
+        binding.spinnerDockJustify.setSelection(
+            justifyModes.indexOf(prefs.dockJustify).coerceAtLeast(0)
+        )
 
         binding.spinnerPackage.adapter = ArrayAdapter(
             this,
@@ -105,6 +120,11 @@ class WidgetConfigureActivity : AppCompatActivity() {
         prefs.showPages = binding.checkShowPages.isChecked
         prefs.darkTheme = binding.checkDark.isChecked
         prefs.dockOnTop = binding.checkDockTop.isChecked
+        prefs.dockIconBorder = binding.checkDockBorder.isChecked
+        prefs.dockJustify = listOf(
+            WidgetPrefs.JUSTIFY_CENTER,
+            WidgetPrefs.JUSTIFY_SPACE_BETWEEN,
+        ).getOrElse(binding.spinnerDockJustify.selectedItemPosition) { WidgetPrefs.JUSTIFY_CENTER }
         prefs.koreaderPackageMode = packageModes.getOrElse(binding.spinnerPackage.selectedItemPosition) { "auto" }
         prefs.dockIconSizeDp = dockSizes.getOrElse(binding.spinnerDockSize.selectedItemPosition) { 44 }
 

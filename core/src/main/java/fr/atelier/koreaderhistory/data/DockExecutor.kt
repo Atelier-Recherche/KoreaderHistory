@@ -2,7 +2,6 @@ package fr.atelier.koreaderhistory.data
 
 import android.content.Context
 import android.widget.Toast
-import fr.atelier.koreaderhistory.R
 import java.io.File
 
 object DockExecutor {
@@ -11,7 +10,7 @@ object DockExecutor {
         when (slot.actionType) {
             DockActionType.OPEN_KOREADER -> {
                 if (!KoreaderLauncher.openKoreader(context, prefs)) {
-                    toast(context, R.string.no_koreader)
+                    toast(context, "KOReader introuvable")
                 }
             }
             DockActionType.OPEN_BOOK -> {
@@ -20,10 +19,14 @@ object DockExecutor {
                 }
             }
             DockActionType.LAUNCH_APP -> {
-                if (slot.param.isBlank() ||
-                    !KoreaderLauncher.launchApp(context, slot.param, slot.param2.ifBlank { null })
-                ) {
+                if (slot.param.isBlank()) {
                     toast(context, "Application introuvable")
+                } else if (!KoreaderLauncher.launchApp(context, slot.param, slot.param2.ifBlank { null })) {
+                    if (BooxFreezeHelper.isFrozen(context, slot.param)) {
+                        BooxFreezeHelper.toastFrozen(context, slot.label.ifBlank { slot.param })
+                    } else {
+                        toast(context, "Application introuvable")
+                    }
                 }
             }
             DockActionType.OPEN_URI -> {
@@ -40,7 +43,7 @@ object DockExecutor {
             DockActionType.DISPATCHER -> {
                 writePending(prefs, slot)
                 if (!KoreaderLauncher.openKoreader(context, prefs)) {
-                    toast(context, R.string.no_koreader)
+                    toast(context, "KOReader introuvable")
                 }
             }
         }
@@ -100,9 +103,5 @@ object DockExecutor {
 
     private fun toast(context: Context, msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun toast(context: Context, resId: Int) {
-        Toast.makeText(context, context.getString(resId), Toast.LENGTH_SHORT).show()
     }
 }

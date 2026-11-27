@@ -12,9 +12,9 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import fr.atelier.koreaderhistory.R
-import fr.atelier.koreaderhistory.data.AppIconLoader
+import fr.atelier.koreaderhistory.core.R as CoreR
+import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.HistoryReader
-import fr.atelier.koreaderhistory.data.IconCatalog
 import fr.atelier.koreaderhistory.data.WidgetPrefs
 import fr.atelier.koreaderhistory.ui.WidgetConfigureActivity
 
@@ -179,44 +179,43 @@ class HistoryWidgetProvider : AppWidgetProvider() {
             val slots = prefs.getDockSlots()
             val top = prefs.dockOnTop
             val sizeDp = prefs.dockIconSizeDp
-            views.setViewVisibility(R.id.dock_top, if (top) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.dock_bottom, if (top) View.GONE else View.VISIBLE)
+            val justify = prefs.dockJustify
+            val border = prefs.dockIconBorder
+            val dockId = if (top) R.id.dock_top else R.id.dock_bottom
+            val otherId = if (top) R.id.dock_bottom else R.id.dock_top
 
-            val idsBottom = intArrayOf(
-                R.id.dock_slot_0, R.id.dock_slot_1, R.id.dock_slot_2,
-                R.id.dock_slot_3, R.id.dock_slot_4, R.id.dock_slot_5
-            )
-            val idsTop = intArrayOf(
-                R.id.dock_slot_0_top, R.id.dock_slot_1_top, R.id.dock_slot_2_top,
-                R.id.dock_slot_3_top, R.id.dock_slot_4_top, R.id.dock_slot_5_top
-            )
-            val activeIds = if (top) idsTop else idsBottom
-            val inactiveIds = if (top) idsBottom else idsTop
-            inactiveIds.forEach { views.setViewVisibility(it, View.GONE) }
+            views.setViewVisibility(dockId, View.VISIBLE)
+            views.setViewVisibility(otherId, View.GONE)
+            views.removeAllViews(dockId)
+            views.removeAllViews(otherId)
 
-            for (i in activeIds.indices) {
-                val viewId = activeIds[i]
-                val slot = slots.getOrNull(i)
-                if (slot == null) {
-                    views.setViewVisibility(viewId, View.GONE)
-                    continue
+            val spaceBetween = justify == WidgetPrefs.JUSTIFY_SPACE_BETWEEN && slots.size > 1
+            slots.forEachIndexed { i, slot ->
+                if (spaceBetween && i > 0) {
+                    views.addView(dockId, RemoteViews(context.packageName, R.layout.widget_dock_spacer))
                 }
-                views.setViewVisibility(viewId, View.VISIBLE)
-                val appIcon = AppIconLoader.loadBitmap(context, slot.iconPackage, sizeDp)
-                if (appIcon != null) {
-                    views.setImageViewBitmap(viewId, appIcon)
+                val slotRv = RemoteViews(context.packageName, R.layout.widget_dock_slot)
+                val iconId = R.id.dock_slot_icon
+                val bmp = DockIconResolver.loadBitmap(context, slot, sizeDp)
+                if (bmp != null) {
+                    slotRv.setImageViewBitmap(iconId, bmp)
                 } else {
-                    views.setImageViewResource(viewId, IconCatalog.resId(slot.iconKey))
+                    slotRv.setImageViewResource(iconId, fr.atelier.koreaderhistory.data.IconCatalog.resId(slot.iconKey))
                 }
-                views.setContentDescription(viewId, slot.label)
-                applyDockSize(views, viewId, sizeDp)
-
+                if (border) {
+                    slotRv.setInt(iconId, "setBackgroundResource", CoreR.drawable.dock_button_bg)
+                } else {
+                    slotRv.setInt(iconId, "setBackgroundResource", 0)
+                }
+                slotRv.setContentDescription(iconId, slot.label)
+                applyDockSize(slotRv, iconId, sizeDp)
                 val dockPi = activityPi(
                     context,
-                    3000 + appWidgetId * 10 + i,
-                    WidgetClickActivity.dockIntent(context, slot.id, appWidgetId * 10 + i),
+                    3000 + appWidgetId * 20 + i,
+                    WidgetClickActivity.dockIntent(context, slot.id, appWidgetId * 20 + i),
                 )
-                views.setOnClickPendingIntent(viewId, dockPi)
+                slotRv.setOnClickPendingIntent(iconId, dockPi)
+                views.addView(dockId, slotRv)
             }
         }
 

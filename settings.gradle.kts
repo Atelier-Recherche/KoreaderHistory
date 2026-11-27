@@ -14,4 +14,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "KOReaderHistory"
+include(":core")
 include(":app")
+include(":launcher")

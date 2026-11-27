@@ -50,4 +50,14 @@
     <string name="dock_size_l">Grande (56)</string>
     <string name="dock_size_xl">Très grande (72)</string>
     <string name="dock_size_xxl">Très très grande (96)</string>
+    <string name="dock_icon_border">Encadrer les icônes du dock</string>
+    <string name="dock_justify">Alignement du dock</string>
+    <string name="dock_justify_center">Centré</string>
+    <string name="dock_justify_space">Justifié (bords)</string>
+    <string name="pick_icon_visual">Choisir une icône</string>
+    <string name="icon_search_hint">Filtrer les icônes…</string>
+    <string name="icon_source_catalog">Catalogue</string>
+    <string name="icon_source_apps">Applications</string>
+    <string name="icon_source_packs">Icon packs</string>
+    <string name="dock_max_slots">Maximum %1$d icônes</string>
 </resources>

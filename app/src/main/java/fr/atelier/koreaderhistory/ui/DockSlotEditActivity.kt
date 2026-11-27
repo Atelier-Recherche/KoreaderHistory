@@ -1,15 +1,17 @@
 package fr.atelier.koreaderhistory.ui
 
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
-import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import fr.atelier.koreaderhistory.R
-import fr.atelier.koreaderhistory.data.AppIconLoader
 import fr.atelier.koreaderhistory.data.CatalogItem
 import fr.atelier.koreaderhistory.data.DockActionType
+import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.DockSlot
 import fr.atelier.koreaderhistory.data.IconCatalog
 import fr.atelier.koreaderhistory.data.KoreaderCatalog
@@ -21,7 +23,20 @@ class DockSlotEditActivity : AppCompatActivity() {
     private lateinit var prefs: WidgetPrefs
     private var slotId: String = ""
     private var actionType: DockActionType = DockActionType.OPEN_KOREADER
+    private var iconKey: String = "app"
     private var iconPackage: String = ""
+    private var iconPackPackage: String = ""
+    private var iconDrawableName: String = ""
+
+    private val pickIcon = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        val data = result.data ?: return@registerForActivityResult
+        iconKey = data.getStringExtra(IconPickerActivity.EXTRA_ICON_KEY) ?: iconKey
+        iconPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACKAGE).orEmpty()
+        iconPackPackage = data.getStringExtra(IconPickerActivity.EXTRA_ICON_PACK).orEmpty()
+        iconDrawableName = data.getStringExtra(IconPickerActivity.EXTRA_ICON_DRAWABLE).orEmpty()
+        refreshIconSummary()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,25 +54,28 @@ class DockSlotEditActivity : AppCompatActivity() {
         }
 
         actionType = slot.actionType
+        iconKey = slot.iconKey
         iconPackage = slot.iconPackage
+        iconPackPackage = slot.iconPackPackage
+        iconDrawableName = slot.iconDrawableName
         binding.inputLabel.setText(slot.label)
         binding.inputParam.setText(slot.param)
         binding.inputParam2.setText(slot.param2)
 
-        binding.spinnerIcon.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            IconCatalog.labels()
-        )
-        binding.spinnerIcon.setSelection(IconCatalog.keys().indexOf(slot.iconKey).coerceAtLeast(0))
-
-        binding.btnPickAction.setOnClickListener { showActionTypePicker() }
-        binding.btnBrowseParam.setOnClickListener { showParamBrowser() }
-        binding.btnPickAppIcon.setOnClickListener { showAppIconPicker() }
+        binding.spinnerIcon.visibility = View.GONE
+        binding.btnPickAppIcon.text = getString(R.string.pick_icon_visual)
+        binding.btnPickAppIcon.setOnClickListener {
+            pickIcon.launch(Intent(this, IconPickerActivity::class.java))
+        }
         binding.btnResetAppIcon.setOnClickListener {
             iconPackage = ""
+            iconPackPackage = ""
+            iconDrawableName = ""
+            iconKey = "app"
             refreshIconSummary()
         }
+        binding.btnPickAction.setOnClickListener { showActionTypePicker() }
+        binding.btnBrowseParam.setOnClickListener { showParamBrowser() }
         binding.btnSave.setOnClickListener { save() }
         binding.btnDelete.setOnClickListener {
             prefs.removeDockSlot(slotId)
@@ -68,32 +86,28 @@ class DockSlotEditActivity : AppCompatActivity() {
     }
 
     private fun refreshIconSummary() {
-        binding.iconAppSummary.text = if (iconPackage.isNotBlank()) {
-            val label = runCatching {
-                packageManager.getApplicationLabel(
-                    packageManager.getApplicationInfo(iconPackage, 0)
-                ).toString()
-            }.getOrDefault(iconPackage)
-            getString(R.string.app_icon_summary, label)
-        } else {
-            getString(R.string.app_icon_catalog)
+        val preview = DockSlot(
+            id = slotId,
+            label = "",
+            iconKey = iconKey,
+            actionType = actionType,
+            iconPackage = iconPackage,
+            iconPackPackage = iconPackPackage,
+            iconDrawableName = iconDrawableName,
+        )
+        binding.iconAppSummary.text = when {
+            iconPackPackage.isNotBlank() -> "Pack : $iconPackPackage / $iconDrawableName"
+            iconPackage.isNotBlank() -> getString(R.string.app_icon_summary, iconPackage)
+            else -> getString(R.string.app_icon_catalog) + " ($iconKey)"
         }
-    }
-
-    private fun showAppIconPicker() {
-        val apps = AppIconLoader.listLauncherApps(this)
-        if (apps.isEmpty()) {
-            Toast.makeText(this, R.string.catalog_empty, Toast.LENGTH_SHORT).show()
-            return
-        }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.pick_app_icon)
-            .setItems(apps.map { it.label }.toTypedArray()) { _, which ->
-                iconPackage = apps[which].packageName
-                refreshIconSummary()
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        // Reuse summary TextView's compound — show via toast-free preview on label compound
+        binding.iconAppSummary.setCompoundDrawablesWithIntrinsicBounds(
+            DockIconResolver.loadDrawable(this, preview),
+            null,
+            null,
+            null,
+        )
+        binding.iconAppSummary.compoundDrawablePadding = 16
     }
 
     private fun refreshActionUi() {
@@ -197,32 +211,30 @@ class DockSlotEditActivity : AppCompatActivity() {
                 ) {
                     binding.inputLabel.setText(item.title)
                 }
-                item.suggestedIcon?.let { key ->
-                    val idx = IconCatalog.keys().indexOf(key)
-                    if (idx >= 0) binding.spinnerIcon.setSelection(idx)
-                }
-                // Special-case: continue from system list
+                item.suggestedIcon?.let { key -> iconKey = key }
                 if (item.param == "continue" && item.param2.isBlank() &&
                     actionType == DockActionType.SYSTEM_ACTION
                 ) {
                     actionType = DockActionType.CONTINUE
                 }
                 refreshActionUi()
+                refreshIconSummary()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun save() {
-        val iconKey = IconCatalog.keys()[binding.spinnerIcon.selectedItemPosition]
         val updated = DockSlot(
             id = slotId,
             label = binding.inputLabel.text?.toString().orEmpty().ifBlank { actionType.label },
-            iconKey = iconKey,
+            iconKey = iconKey.ifBlank { "app" },
             actionType = actionType,
             param = binding.inputParam.text?.toString().orEmpty(),
             param2 = binding.inputParam2.text?.toString().orEmpty(),
             iconPackage = iconPackage,
+            iconPackPackage = iconPackPackage,
+            iconDrawableName = iconDrawableName,
         )
         prefs.upsertDockSlot(updated)
         finish()

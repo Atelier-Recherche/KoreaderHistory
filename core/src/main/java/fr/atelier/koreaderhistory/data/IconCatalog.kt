@@ -1,6 +1,6 @@
 package fr.atelier.koreaderhistory.data
 
-import fr.atelier.koreaderhistory.R
+import fr.atelier.koreaderhistory.core.R
 
 object IconCatalog {
     data class IconDef(val key: String, val label: String, val resId: Int)

@@ -47,12 +47,20 @@ function Use-ProjectJava {
     return $jdk
 }
 
-function Get-AppVersionName {
-    param([string]$Root = (Get-ProjectRoot))
-    $gradle = Join-Path $Root 'app\build.gradle.kts'
+function Get-ModuleVersionName {
+    param(
+        [string]$Root = (Get-ProjectRoot),
+        [ValidateSet('app', 'launcher')][string]$Module = 'app'
+    )
+    $gradle = Join-Path $Root "$Module\build.gradle.kts"
     $text = Get-Content $gradle -Raw
     if ($text -match 'versionName\s*=\s*"([^"]+)"') { return $Matches[1] }
     return '0.0.0'
+}
+
+function Get-AppVersionName {
+    param([string]$Root = (Get-ProjectRoot))
+    return Get-ModuleVersionName -Root $Root -Module app
 }
 
 function Get-AppVersionCode {
@@ -61,6 +69,24 @@ function Get-AppVersionCode {
     $text = Get-Content $gradle -Raw
     if ($text -match 'versionCode\s*=\s*(\d+)') { return [int]$Matches[1] }
     return 1
+}
+
+function Get-ModuleApkPath {
+    param(
+        [Parameter(Mandatory)][string]$Root,
+        [ValidateSet('app', 'launcher')][string]$Module,
+        [ValidateSet('Debug', 'Release')][string]$Variant = 'Debug'
+    )
+    $folder = $Variant.ToLowerInvariant()
+    $signed = Join-Path $Root "$Module\build\outputs\apk\$folder\$Module-$folder.apk"
+    $unsigned = Join-Path $Root "$Module\build\outputs\apk\$folder\$Module-$folder-unsigned.apk"
+    if ($Variant -eq 'Release') {
+        if (Test-Path $signed) { return $signed }
+        if (Test-Path $unsigned) { return $unsigned }
+        throw "APK release introuvable: $signed"
+    }
+    if (-not (Test-Path $signed)) { throw "APK debug introuvable: $signed — lancez d'abord le build" }
+    return $signed
 }
 
 function Invoke-Gradle {
@@ -85,51 +111,50 @@ function Invoke-Gradle {
 
 function Get-DebugApkPath {
     param([string]$Root = (Get-ProjectRoot))
-    $apk = Join-Path $Root 'app\build\outputs\apk\debug\app-debug.apk'
-    if (-not (Test-Path $apk)) { throw "APK debug introuvable: $apk — lancez d'abord build.ps1" }
-    return $apk
+    return Get-ModuleApkPath -Root $Root -Module app -Variant Debug
 }
 
 function Get-ReleaseApkPath {
     param([string]$Root = (Get-ProjectRoot))
-    $signed = Join-Path $Root 'app\build\outputs\apk\release\app-release.apk'
-    $unsigned = Join-Path $Root 'app\build\outputs\apk\release\app-release-unsigned.apk'
-    if (Test-Path $signed) { return $signed }
-    if (Test-Path $unsigned) { return $unsigned }
-    throw "APK release introuvable sous app\build\outputs\apk\release\"
+    return Get-ModuleApkPath -Root $Root -Module app -Variant Release
 }
 
 function Get-ApkOutputPath {
     param(
         [Parameter(Mandatory)][string]$Root,
-        [ValidateSet('Debug', 'Release')][string]$Variant = 'Debug'
+        [ValidateSet('Debug', 'Release')][string]$Variant = 'Debug',
+        [ValidateSet('app', 'launcher')][string]$Module = 'app'
     )
+    $folder = $Variant.ToLowerInvariant()
+    $signed = Join-Path $Root "$Module\build\outputs\apk\$folder\$Module-$folder.apk"
+    $unsigned = Join-Path $Root "$Module\build\outputs\apk\$folder\$Module-$folder-unsigned.apk"
     if ($Variant -eq 'Release') {
-        $signed = Join-Path $Root 'app\build\outputs\apk\release\app-release.apk'
-        $unsigned = Join-Path $Root 'app\build\outputs\apk\release\app-release-unsigned.apk'
         if (Test-Path $signed) { return $signed }
         if (Test-Path $unsigned) { return $unsigned }
         return $signed
     }
-    return (Join-Path $Root 'app\build\outputs\apk\debug\app-debug.apk')
+    return $signed
 }
 
 function Test-ApkNeedsRebuild {
     <#
     .SYNOPSIS
-      True si l'APK manque ou si une source (app, gradle, plugin) est plus recente.
+      True si l'APK manque ou si une source (module, core, gradle, plugin) est plus recente.
     #>
     param(
         [Parameter(Mandatory)][string]$Root,
-        [ValidateSet('Debug', 'Release')][string]$Variant = 'Debug'
+        [ValidateSet('Debug', 'Release')][string]$Variant = 'Debug',
+        [ValidateSet('app', 'launcher')][string]$Module = 'app'
     )
-    $apk = Get-ApkOutputPath -Root $Root -Variant $Variant
+    $apk = Get-ApkOutputPath -Root $Root -Variant $Variant -Module $Module
     if (-not (Test-Path $apk)) { return $true }
 
     $apkTime = (Get-Item $apk).LastWriteTimeUtc
     $watch = @(
-        (Join-Path $Root 'app\src'),
-        (Join-Path $Root 'app\build.gradle.kts'),
+        (Join-Path $Root "$Module\src"),
+        (Join-Path $Root "$Module\build.gradle.kts"),
+        (Join-Path $Root 'core\src'),
+        (Join-Path $Root 'core\build.gradle.kts'),
         (Join-Path $Root 'build.gradle.kts'),
         (Join-Path $Root 'settings.gradle.kts'),
         (Join-Path $Root 'gradle.properties'),

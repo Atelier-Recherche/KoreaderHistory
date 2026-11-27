@@ -8,9 +8,10 @@ import android.os.Environment
 import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import fr.atelier.koreaderhistory.databinding.ActivityMainBinding
+import fr.atelier.koreaderhistory.R
 import fr.atelier.koreaderhistory.data.BridgeInstaller
 import fr.atelier.koreaderhistory.data.WidgetPrefs
+import fr.atelier.koreaderhistory.databinding.ActivityMainBinding
 import fr.atelier.koreaderhistory.widget.HistoryWidgetProvider
 
 class MainActivity : AppCompatActivity() {
@@ -33,7 +34,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnBridge.setOnClickListener { installBridge() }
         binding.btnRefreshWidgets.setOnClickListener {
             HistoryWidgetProvider.refreshAll(this)
-            Toast.makeText(this, getString(fr.atelier.koreaderhistory.R.string.refresh), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.refresh), Toast.LENGTH_SHORT).show()
         }
         refreshPermissionUi()
     }
@@ -48,7 +49,7 @@ class MainActivity : AppCompatActivity() {
         binding.permissionStatus.text = if (ok) {
             "Accès stockage OK — dossier : ${prefs.koreaderPath}"
         } else {
-            getString(fr.atelier.koreaderhistory.R.string.need_permission)
+            getString(R.string.need_permission)
         }
         binding.btnPermission.isEnabled = !ok
     }
@@ -73,19 +74,11 @@ class MainActivity : AppCompatActivity() {
     private fun installBridge() {
         BridgeInstaller.install(this, prefs).fold(
             onSuccess = { path ->
-                Toast.makeText(
-                    this,
-                    getString(fr.atelier.koreaderhistory.R.string.bridge_installed, path),
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, getString(R.string.bridge_installed, path), Toast.LENGTH_LONG).show()
             },
             onFailure = { e ->
-                Toast.makeText(
-                    this,
-                    getString(fr.atelier.koreaderhistory.R.string.bridge_failed, e.message ?: "?"),
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+                Toast.makeText(this, getString(R.string.bridge_failed, e.message ?: "?"), Toast.LENGTH_LONG).show()
+            },
         )
     }
 }

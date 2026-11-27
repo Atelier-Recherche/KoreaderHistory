@@ -11,4 +11,11 @@
         <item name="android:textColorPrimary">@color/eink_fg</item>
         <item name="android:textColorSecondary">@color/eink_muted</item>
     </style>
+
+    <style name="Theme.KOReaderHistory.Transparent" parent="Theme.KOReaderHistory">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

@@ -8,4 +8,6 @@ data class DockSlot(
     val param: String = "",
     val param2: String = "",
     val iconPackage: String = "",
+    val iconPackPackage: String = "",
+    val iconDrawableName: String = "",
 )

@@ -61,6 +61,15 @@ class WidgetPrefs(context: Context) {
         get() = prefs.getInt(KEY_DOCK_SIZE, 44).coerceIn(28, 120)
         set(value) = prefs.edit().putInt(KEY_DOCK_SIZE, value.coerceIn(28, 120)).apply()
 
+    var dockIconBorder: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_BORDER, true)
+        set(value) = prefs.edit().putBoolean(KEY_DOCK_BORDER, value).apply()
+
+    /** "center" or "space_between" */
+    var dockJustify: String
+        get() = prefs.getString(KEY_DOCK_JUSTIFY, JUSTIFY_CENTER) ?: JUSTIFY_CENTER
+        set(value) = prefs.edit().putString(KEY_DOCK_JUSTIFY, value).apply()
+
     fun getDockSlots(): List<DockSlot> {
         val raw = prefs.getString(KEY_DOCK, null)
         if (raw.isNullOrBlank()) return defaultDock()
@@ -78,6 +87,8 @@ class WidgetPrefs(context: Context) {
                             param = o.optString("param", ""),
                             param2 = o.optString("param2", ""),
                             iconPackage = o.optString("iconPackage", ""),
+                            iconPackPackage = o.optString("iconPackPackage", ""),
+                            iconDrawableName = o.optString("iconDrawableName", ""),
                         )
                     )
                 }
@@ -87,7 +98,7 @@ class WidgetPrefs(context: Context) {
 
     fun setDockSlots(slots: List<DockSlot>) {
         val arr = JSONArray()
-        slots.take(6).forEach { slot ->
+        slots.take(MAX_DOCK_SLOTS).forEach { slot ->
             arr.put(
                 JSONObject()
                     .put("id", slot.id)
@@ -97,6 +108,8 @@ class WidgetPrefs(context: Context) {
                     .put("param", slot.param)
                     .put("param2", slot.param2)
                     .put("iconPackage", slot.iconPackage)
+                    .put("iconPackPackage", slot.iconPackPackage)
+                    .put("iconDrawableName", slot.iconDrawableName)
             )
         }
         prefs.edit().putString(KEY_DOCK, arr.toString()).apply()
@@ -105,7 +118,7 @@ class WidgetPrefs(context: Context) {
     fun upsertDockSlot(slot: DockSlot) {
         val list = getDockSlots().toMutableList()
         val idx = list.indexOfFirst { it.id == slot.id }
-        if (idx >= 0) list[idx] = slot else if (list.size < 6) list.add(slot)
+        if (idx >= 0) list[idx] = slot else if (list.size < MAX_DOCK_SLOTS) list.add(slot)
         setDockSlots(list)
     }
 
@@ -116,6 +129,9 @@ class WidgetPrefs(context: Context) {
     companion object {
         const val PREFS = "widget_prefs"
         const val DEFAULT_PATH = "/storage/emulated/0/koreader"
+        const val MAX_DOCK_SLOTS = 12
+        const val JUSTIFY_CENTER = "center"
+        const val JUSTIFY_SPACE_BETWEEN = "space_between"
 
         private const val KEY_PATH = "koreader_path"
         private const val KEY_COUNT = "item_count"
@@ -130,6 +146,8 @@ class WidgetPrefs(context: Context) {
         private const val KEY_DOCK_TOP = "dock_top"
         private const val KEY_PKG_MODE = "pkg_mode"
         private const val KEY_DOCK_SIZE = "dock_icon_size"
+        private const val KEY_DOCK_BORDER = "dock_icon_border"
+        private const val KEY_DOCK_JUSTIFY = "dock_justify"
         private const val KEY_DOCK = "dock_slots"
 
         fun defaultDock(): List<DockSlot> = listOf(
