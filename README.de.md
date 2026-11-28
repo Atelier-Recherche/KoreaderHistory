@@ -6,7 +6,7 @@
 <td><img src="readme-media/logo_koreaderhistory.png" alt="KOReader History" width="140" /></td>
 <td align="left">
 <h1 style="margin:0">KOReader History</h1>
-<p style="margin:0.25em 0 0"><strong>Verlaufs-Widget · Dock · Android</strong><br/>App · athistory.koplugin-Bridge · l’Atelier</p>
+<p style="margin:0.25em 0 0"><strong>Widget · Dock · E-Ink-Launcher · Android</strong><br/>Apps · athistory.koplugin-Bridge · l’Atelier</p>
 </td>
 </tr>
 </table>
@@ -38,34 +38,45 @@
 
 ## 📖 Über
 
-Android-App **KOReader History** (von l’Atelier): Lesehistorie-Widget und Aktions-Dock, verbunden mit KOReader über das Bridge-Plugin **Atelier History Bridge** (`athistory.koplugin`).
+Android-Monorepo (von l’Atelier) mit **zwei unabhängigen Apps** und einer gemeinsamen KOReader-Bridge:
 
-Das Widget liest die KOReader-Historie auf dem Gerät; das Dock kann KOReader, ein Buch, eine App, eine URI öffnen oder die Bridge bitten, eine Aktion in KOReader auszuführen (Historie, Ordner, Sammlung, Plugin, Dispatcher…).
+1. **KOReader History** — Lesehistorie-Widget + Aktions-Dock  
+2. **Atelier e-ink Launcher** — Vollbild-Launcher für E-Ink / Boox (Desktop, Dock, App-Schublade, Benachrichtigungen…)
+
+Beide Apps teilen sich `core/` und das Plugin **Atelier History Bridge** (`athistory.koplugin`). Das **Widget-Dock** und das **Launcher-Dock** sind **getrennt** (eigene Prefs und Slots): Sie können nur das Widget, nur den Launcher oder beides installieren.
 
 ## 🧩 Komponenten
 
-| Teil | Rolle |
-|------|------|
-| Android-App (`app/`, Gradle) | Widget + Konfiguration + Dock |
-| `athistory.koplugin` | Bridge: liest `settings/athistory/pending.lua` und führt die Aktion aus |
-| Eingebettete Assets | Bridge-Kopie, installierbar aus der App |
-
-Package: `fr.atelier.koreaderhistory`.
+| Teil | Package / Pfad | Rolle |
+|------|----------------|------|
+| Widget-App | `fr.atelier.koreaderhistory` (`app/`) | Historie-Widget + Config + Widget-Dock |
+| Launcher | `fr.atelier.einklauncher` (`launcher/`) | E-Ink-Home: Desktop, Dock, Apps, Notifs |
+| Core | `core/` | Prefs, Historie, Dock, Icons, Bridge-Helfer |
+| `athistory.koplugin` | KOReader-Plugins | Bridge: liest `settings/athistory/pending.lua` und führt die Aktion aus |
+| `deploy.ps1` | Repo-Wurzel | Build + Install beider APKs + ADB-Grants + Plugin-Push |
 
 ## ⬇️ Installation
 
-### Android-Anwendung
+### Mit `deploy.ps1` (empfohlen)
+
+```powershell
+.\deploy.ps1            # Build bei Bedarf + Install Widget + Launcher + Plugin
+.\deploy.ps1 -Force     # Rebuild erzwingen
+.\deploy.ps1 -SkipInstall
+```
+
+### Manuell
 
 1. Gradle-Projekt öffnen (`ATkoreaderhistory`)
-2. Bauen: `gradlew.bat assembleDebug` (oder Android Studio)
-3. APK auf dem Gerät installieren
-4. Zugriff auf **alle Dateien** gewähren (nötig zum Lesen der KOReader-Historie)
-5. Widget **KOReader History** zum Startbildschirm hinzufügen
-6. KOReader-Pfad, Anzahl, Filter, Theme, Dock konfigurieren…
+2. Bauen: `gradlew.bat :app:assembleDebug :launcher:assembleDebug`
+3. APKs auf dem Gerät installieren
+4. Zugriff auf **alle Dateien** gewähren (Lesen der KOReader-Historie)
+5. **Widget**: **KOReader History** zum Startbildschirm hinzufügen und konfigurieren  
+6. **Launcher** (optional): **Atelier e-ink Launcher** als Home-App setzen; Benachrichtigungs- / Barrierefreiheits- / Nutzungszugriff bei Bedarf aktivieren
 
 ### KOReader-Bridge
 
-Aus der App: **KOReader-Bridge installieren** (kopiert `athistory.koplugin` in die KOReader-Plugins), **oder** manuell kopieren:
+Aus der Widget-App: **KOReader-Bridge installieren**, über `deploy.ps1`, **oder** manuell kopieren:
 
 ```
 <koreader>/plugins/athistory.koplugin/
@@ -75,13 +86,31 @@ Aus der App: **KOReader-Bridge installieren** (kopiert `athistory.koplugin` in d
 
 Danach KOReader neu starten und das Plugin bei Bedarf aktivieren.
 
-## ✏️ Nutzung
+## ✏️ Nutzung — Widget
 
-* Das Widget zeigt kürzlich gelesene Werke (Cover / Titel / Autor / Prozent je nach Optionen)
+* Zeigt kürzlich gelesene Werke (Cover / Titel / Autor / Prozent je nach Optionen)
 * Ein Tippen öffnet das Buch in KOReader
-* Das **Dock** (konfigurierbare Icons) startet Android-Aktionen oder schreibt eine „pending“-Aktion und öffnet KOReader; die Bridge führt sie beim Start aus
+* Das **Widget-Dock** (unabhängig vom Launcher) startet Android-Aktionen oder schreibt eine „pending“-Aktion; die Bridge führt sie beim KOReader-Start aus
+* Schalter **Dock anzeigen** + **Dock bearbeiten** / Standard-Shortcuts wiederherstellen
 
-### Dock-Aktionen
+## 🏠 Nutzung — E-Ink-Launcher
+
+Vollbild (System-Statusleiste ausgeblendet). Langer Druck auf dem Desktop für das Menü.
+
+| Bereich | Inhalt |
+|---------|--------|
+| Statusleiste (optional) | Uhrzeit, Datum (Formate: Montag, Mo. 27. Nov., …), WLAN, Bluetooth, Akku |
+| Android-Widgets | Hinzufügen / Größe ändern / Reihenfolge |
+| Historie-Panel | KOReader-Bücher + Entfernen-Button |
+| Desktop-Raster | Apps, Ordner, KOReader-Shortcuts — einstellbare Spalten / Größen, Zellenplatzierung |
+| Launcher-Dock | Apps + Benachrichtigungen (Badge) + eigene Slots — Show/Hide unabhängig vom Widget |
+| App-Schublade | Suche, an Dock anheften, eigene Icons, Apps ausblenden |
+
+**Verschiebe-Modus**: Desktop-Menü → *Verschiebe-Modus* → Pfeile an jedem Icon → *Fertig*.
+
+Außerdem: Alt+Tab / Taskleiste, Notification-Listener, Accessibility-Service (Hotkeys), Icon-Packs (volle Liste + Suche).
+
+## 🎯 Dock-Aktionen (Widget & Launcher)
 
 | Aktion | Seite | Beschreibung |
 |--------|------|-------------|
@@ -97,12 +126,23 @@ Danach KOReader neu starten und das Plugin bei Bedarf aktivieren.
 | Systemaktion | Bridge | Modul / Dispatcher |
 | Dispatcher (freie ID) | Bridge | Dispatcher-Aktions-ID |
 
-## ⚙️ Widget-Konfiguration
+## ⚙️ Konfiguration
+
+### Widget (`fr.atelier.koreaderhistory`)
 
 * KOReader-Ordner, Package (`org.koreader.launcher` / F-Droid / auto)
 * Anzahl, fertige / Nicht-Bücher ausschließen
 * Autor / Prozent / Seiten, Dateiname, Buchstaben-Cover, dunkles Theme
-* Dock oben, Icon-Größe, Slot-Bearbeitung
+* Dock: anzeigen, oben/unten, Größe, Rahmen, Slot-Bearbeitung
+
+### Launcher (`fr.atelier.einklauncher`)
+
+* Größen / Rahmen / Spalten: Dock, Desktop, Schublade
+* Schriften: Desktop- / Schubladen-Labels, Statusleiste, Historie
+* Statusleiste: Elemente + Datumsformat
+* Ausgeblendete Apps / eigene Icons (Schublade & Desktop)
+* Anpassbare Dock-Icons **Apps** und **Benachrichtigungen**
+* Links: Speicher, Home, Barrierefreiheit, Benachrichtigungen, Nutzungsstatistik
 
 ## 🔗 Ressourcen
 

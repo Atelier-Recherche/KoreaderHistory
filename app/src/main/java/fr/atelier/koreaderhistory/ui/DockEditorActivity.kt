@@ -29,12 +29,20 @@ class DockEditorActivity : AppCompatActivity() {
         prefs = WidgetPrefs(this)
         prefs.ensureDockSlots()
 
-        adapter = DockAdapter { slot ->
-            startActivity(
-                Intent(this, DockSlotEditActivity::class.java)
-                    .putExtra(DockSlotEditActivity.EXTRA_SLOT_ID, slot.id)
-            )
-        }
+        adapter = DockAdapter(
+            onClick = { slot ->
+                startActivity(
+                    Intent(this, DockSlotEditActivity::class.java)
+                        .putExtra(DockSlotEditActivity.EXTRA_SLOT_ID, slot.id)
+                )
+            },
+            onMove = { slot, delta ->
+                if (prefs.moveDockSlot(slot.id, delta)) {
+                    adapter.submit(prefs.getDockSlots())
+                    HistoryWidgetProvider.refreshAll(this)
+                }
+            },
+        )
         binding.dockList.layoutManager = LinearLayoutManager(this)
         binding.dockList.adapter = adapter
 
@@ -76,6 +84,7 @@ class DockEditorActivity : AppCompatActivity() {
 
     private class DockAdapter(
         private val onClick: (DockSlot) -> Unit,
+        private val onMove: (DockSlot, Int) -> Unit,
     ) : RecyclerView.Adapter<DockAdapter.VH>() {
         private var items: List<DockSlot> = emptyList()
 
@@ -92,11 +101,17 @@ class DockEditorActivity : AppCompatActivity() {
         override fun getItemCount(): Int = items.size
 
         override fun onBindViewHolder(holder: VH, position: Int) {
-            holder.bind(items[position], onClick)
+            holder.bind(items[position], position, items.size, onClick, onMove)
         }
 
         class VH(private val binding: ItemDockSlotBinding) : RecyclerView.ViewHolder(binding.root) {
-            fun bind(slot: DockSlot, onClick: (DockSlot) -> Unit) {
+            fun bind(
+                slot: DockSlot,
+                position: Int,
+                count: Int,
+                onClick: (DockSlot) -> Unit,
+                onMove: (DockSlot, Int) -> Unit,
+            ) {
                 binding.slotLabel.text = slot.label
                 binding.slotAction.text = buildString {
                     append(slot.actionType.label)
@@ -106,6 +121,12 @@ class DockEditorActivity : AppCompatActivity() {
                     DockIconResolver.loadDrawable(binding.root.context, slot)
                 )
                 binding.root.setOnClickListener { onClick(slot) }
+                binding.btnMoveUp.isEnabled = position > 0
+                binding.btnMoveDown.isEnabled = position < count - 1
+                binding.btnMoveUp.alpha = if (position > 0) 1f else 0.3f
+                binding.btnMoveDown.alpha = if (position < count - 1) 1f else 0.3f
+                binding.btnMoveUp.setOnClickListener { onMove(slot, -1) }
+                binding.btnMoveDown.setOnClickListener { onMove(slot, 1) }
             }
         }
     }

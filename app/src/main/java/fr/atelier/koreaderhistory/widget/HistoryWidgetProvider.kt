@@ -12,7 +12,6 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import fr.atelier.koreaderhistory.R
-import fr.atelier.koreaderhistory.core.R as CoreR
 import fr.atelier.koreaderhistory.data.DockIconResolver
 import fr.atelier.koreaderhistory.data.HistoryReader
 import fr.atelier.koreaderhistory.data.WidgetPrefs
@@ -61,18 +60,25 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_title, View.GONE)
                 views.setTextColor(R.id.empty_view, muted)
 
-                bindBooks(context, views, prefs, fg, muted)
-                bindDock(context, views, prefs, appWidgetId)
+                val density = context.resources.displayMetrics.density
+                val sidePad = (4 * density).toInt()
+                val topPad = (prefs.widgetMarginTopDp * density).toInt()
+                val bottomPad = (prefs.widgetMarginBottomDp * density).toInt()
+                views.setViewPadding(R.id.widget_root, sidePad, topPad, sidePad, bottomPad)
+
+                val titleSp = prefs.historyFontSp.toFloat()
+                views.setTextViewTextSize(R.id.empty_view, TypedValue.COMPLEX_UNIT_SP, titleSp)
+
+                bindBooks(context, views, prefs, fg, muted, appWidgetId)
+                bindDock(context, views, prefs, appWidgetId, fg)
 
                 val refreshPi = activityPi(
                     context,
                     1000 + appWidgetId,
                     WidgetClickActivity.refreshIntent(context),
                 )
-                views.setOnClickPendingIntent(R.id.btn_refresh, refreshPi)
+                views.setOnClickPendingIntent(R.id.btn_refresh_empty, refreshPi)
 
-                // Config : tap prolongé n’existe pas en RemoteViews → petit refresh
-                // ouvre aussi la config si l’historique est vide (sinon via l’app).
                 val cfgIntent = Intent(context, WidgetConfigureActivity::class.java).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
@@ -85,7 +91,6 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             } catch (t: Throwable) {
                 Log.e("HistoryWidget", "updateAppWidget failed for $appWidgetId", t)
-                // Minimal fallback so the widget host does not keep killing the app
                 runCatching {
                     val fallback = RemoteViews(context.packageName, R.layout.widget_history)
                     fallback.setViewVisibility(R.id.widget_title, View.GONE)
@@ -102,36 +107,54 @@ class HistoryWidgetProvider : AppWidgetProvider() {
             prefs: WidgetPrefs,
             fg: Int,
             muted: Int,
+            appWidgetId: Int,
         ) {
             views.removeAllViews(R.id.book_container)
             val books = runCatching { HistoryReader(prefs).loadBooks() }.getOrDefault(emptyList())
+            val titleSp = prefs.historyFontSp.toFloat()
+            val mutedSp = (prefs.historyFontSp - 2).coerceAtLeast(8).toFloat()
+            val coverSp = (prefs.historyFontSp + 3).coerceAtMost(22).toFloat()
+            val pctSp = (prefs.historyFontSp - 1).coerceAtLeast(9).toFloat()
+
             if (books.isEmpty()) {
                 views.setViewVisibility(R.id.empty_view, View.VISIBLE)
                 views.setViewVisibility(R.id.book_container, View.GONE)
+                views.setViewVisibility(R.id.btn_refresh_empty, View.VISIBLE)
                 return
             }
             views.setViewVisibility(R.id.empty_view, View.GONE)
             views.setViewVisibility(R.id.book_container, View.VISIBLE)
+            views.setViewVisibility(R.id.btn_refresh_empty, View.GONE)
+
+            val refreshPi = activityPi(
+                context,
+                1000 + appWidgetId,
+                WidgetClickActivity.refreshIntent(context),
+            )
 
             books.forEachIndexed { index, book ->
                 val row = RemoteViews(context.packageName, R.layout.widget_book_item)
                 val displayTitle = book.displayTitle(prefs.useFilenameAsTitle)
+                val isLast = index == books.lastIndex
 
                 if (prefs.showCoverLetter) {
                     row.setViewVisibility(R.id.cover_letter, View.VISIBLE)
                     row.setTextViewText(R.id.cover_letter, book.coverLetter(prefs.useFilenameAsTitle))
                     row.setTextColor(R.id.cover_letter, fg)
+                    row.setTextViewTextSize(R.id.cover_letter, TypedValue.COMPLEX_UNIT_SP, coverSp)
                 } else {
                     row.setViewVisibility(R.id.cover_letter, View.GONE)
                 }
 
                 row.setTextViewText(R.id.book_title, displayTitle)
                 row.setTextColor(R.id.book_title, fg)
+                row.setTextViewTextSize(R.id.book_title, TypedValue.COMPLEX_UNIT_SP, titleSp)
 
                 if (prefs.showAuthor && !book.author.isNullOrBlank()) {
                     row.setViewVisibility(R.id.book_author, View.VISIBLE)
                     row.setTextViewText(R.id.book_author, book.author)
                     row.setTextColor(R.id.book_author, muted)
+                    row.setTextViewTextSize(R.id.book_author, TypedValue.COMPLEX_UNIT_SP, mutedSp)
                 } else {
                     row.setViewVisibility(R.id.book_author, View.GONE)
                 }
@@ -140,6 +163,7 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                     row.setViewVisibility(R.id.book_pages, View.VISIBLE)
                     row.setTextViewText(R.id.book_pages, "${book.pageCount} p.")
                     row.setTextColor(R.id.book_pages, muted)
+                    row.setTextViewTextSize(R.id.book_pages, TypedValue.COMPLEX_UNIT_SP, mutedSp)
                 } else {
                     row.setViewVisibility(R.id.book_pages, View.GONE)
                 }
@@ -151,9 +175,17 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                     row.setProgressBar(R.id.book_progress, 100, pct, false)
                     row.setTextViewText(R.id.book_percent, "$pct%")
                     row.setTextColor(R.id.book_percent, fg)
+                    row.setTextViewTextSize(R.id.book_percent, TypedValue.COMPLEX_UNIT_SP, pctSp)
                 } else {
                     row.setViewVisibility(R.id.book_progress, View.GONE)
                     row.setViewVisibility(R.id.book_percent, View.GONE)
+                }
+
+                if (isLast) {
+                    row.setViewVisibility(R.id.btn_refresh, View.VISIBLE)
+                    row.setOnClickPendingIntent(R.id.btn_refresh, refreshPi)
+                } else {
+                    row.setViewVisibility(R.id.btn_refresh, View.GONE)
                 }
 
                 val openPi = activityPi(
@@ -167,8 +199,6 @@ class HistoryWidgetProvider : AppWidgetProvider() {
         }
 
         private fun activityPi(context: Context, requestCode: Int, intent: Intent): PendingIntent {
-            // Do NOT attach ActivityOptions.setPendingIntentBackgroundActivityStartMode —
-            // Android 15 throws IllegalArgumentException when that flag is set by the PI creator.
             return PendingIntent.getActivity(
                 context,
                 requestCode,
@@ -177,7 +207,13 @@ class HistoryWidgetProvider : AppWidgetProvider() {
             )
         }
 
-        private fun bindDock(context: Context, views: RemoteViews, prefs: WidgetPrefs, appWidgetId: Int) {
+        private fun bindDock(
+            context: Context,
+            views: RemoteViews,
+            prefs: WidgetPrefs,
+            appWidgetId: Int,
+            fg: Int,
+        ) {
             views.removeAllViews(R.id.dock_top)
             views.removeAllViews(R.id.dock_bottom)
             if (!prefs.dockEnabled) {
@@ -191,6 +227,7 @@ class HistoryWidgetProvider : AppWidgetProvider() {
             val sizeDp = prefs.dockIconSizeDp
             val justify = prefs.dockJustify
             val border = prefs.dockIconBorder
+            val showLabels = prefs.dockShowLabels
             val dockId = if (top) R.id.dock_top else R.id.dock_bottom
             val otherId = if (top) R.id.dock_bottom else R.id.dock_top
 
@@ -202,6 +239,12 @@ class HistoryWidgetProvider : AppWidgetProvider() {
 
             views.setViewVisibility(dockId, View.VISIBLE)
             views.setViewVisibility(otherId, View.GONE)
+
+            val density = context.resources.displayMetrics.density
+            val dockPadTop = (prefs.dockMarginTopDp * density).toInt()
+            val dockPadBottom = (prefs.dockMarginBottomDp * density).toInt()
+            views.setViewPadding(dockId, 0, dockPadTop, 0, dockPadBottom)
+            views.setViewPadding(otherId, 0, 0, 0, 0)
 
             val spaceBetween = justify == WidgetPrefs.JUSTIFY_SPACE_BETWEEN && slots.size > 1
             slots.forEachIndexed { i, slot ->
@@ -215,7 +258,10 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 if (bmp != null) {
                     slotRv.setImageViewBitmap(iconId, bmp)
                 } else {
-                    slotRv.setImageViewResource(iconId, fr.atelier.koreaderhistory.data.IconCatalog.resId(slot.iconKey))
+                    slotRv.setImageViewResource(
+                        iconId,
+                        fr.atelier.koreaderhistory.data.IconCatalog.resId(slot.iconKey),
+                    )
                 }
                 if (border) {
                     slotRv.setInt(iconId, "setBackgroundResource", R.drawable.dock_button_bg)
@@ -224,11 +270,21 @@ class HistoryWidgetProvider : AppWidgetProvider() {
                 }
                 slotRv.setContentDescription(iconId, slot.label)
                 applyDockSize(slotRv, iconId, sizeDp)
+
+                if (showLabels && slot.label.isNotBlank()) {
+                    slotRv.setViewVisibility(R.id.dock_slot_label, View.VISIBLE)
+                    slotRv.setTextViewText(R.id.dock_slot_label, slot.label)
+                    slotRv.setTextColor(R.id.dock_slot_label, fg)
+                } else {
+                    slotRv.setViewVisibility(R.id.dock_slot_label, View.GONE)
+                }
+
                 val dockPi = activityPi(
                     context,
                     3000 + appWidgetId * 20 + i,
                     WidgetClickActivity.dockIntent(context, slot.id, appWidgetId * 20 + i),
                 )
+                slotRv.setOnClickPendingIntent(R.id.dock_slot_root, dockPi)
                 slotRv.setOnClickPendingIntent(iconId, dockPi)
                 views.addView(dockId, slotRv)
             }

@@ -5,7 +5,10 @@
     android:layout_height="match_parent"
     android:background="@color/eink_bg"
     android:orientation="vertical"
-    android:padding="4dp">
+    android:paddingLeft="4dp"
+    android:paddingRight="4dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
 
     <LinearLayout
         android:id="@+id/dock_top"
@@ -14,50 +17,50 @@
         android:gravity="center"
         android:minHeight="48dp"
         android:orientation="horizontal"
-        android:paddingBottom="4dp"
         android:visibility="visible" />
 
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="2dp">
+    <!-- Titre masqué (conservé pour IDs / config) -->
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 
-        <!-- Titre masqué (conservé pour IDs / config au long clic refresh) -->
+    <FrameLayout
+        android:id="@+id/books_area"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/book_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical" />
+
         <TextView
-            android:id="@+id/widget_title"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
+            android:id="@+id/empty_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="@string/empty_history"
+            android:textColor="@color/eink_muted"
+            android:textSize="13sp"
             android:visibility="gone" />
 
+        <!-- Refresh overlay quand historique vide -->
         <ImageView
-            android:id="@+id/btn_refresh"
+            android:id="@+id/btn_refresh_empty"
             android:layout_width="28dp"
             android:layout_height="28dp"
-            android:layout_gravity="end|top"
+            android:layout_gravity="end|bottom"
             android:background="@android:color/transparent"
             android:contentDescription="@string/refresh"
             android:padding="4dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/ic_refresh" />
+            android:src="@drawable/ic_refresh"
+            android:visibility="gone" />
     </FrameLayout>
-
-    <LinearLayout
-        android:id="@+id/book_container"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical" />
-
-    <TextView
-        android:id="@+id/empty_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:text="@string/empty_history"
-        android:textColor="@color/eink_muted"
-        android:textSize="13sp"
-        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/dock_bottom"
@@ -65,6 +68,5 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:minHeight="48dp"
-        android:orientation="horizontal"
-        android:paddingTop="4dp" />
+        android:orientation="horizontal" />
 </LinearLayout>

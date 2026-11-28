@@ -48,6 +48,19 @@ class WidgetPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_DARK, false)
         set(value) = prefs.edit().putBoolean(KEY_DARK, value).apply()
 
+    /** Taille police titre historique (sp) ; auteur/pages/etc. dérivés. */
+    var historyFontSp: Int
+        get() = prefs.getInt(KEY_HISTORY_FONT, 13).coerceIn(10, 18)
+        set(value) = prefs.edit().putInt(KEY_HISTORY_FONT, value.coerceIn(10, 18)).apply()
+
+    var widgetMarginTopDp: Int
+        get() = prefs.getInt(KEY_WIDGET_MARGIN_TOP, 4).coerceIn(0, 32)
+        set(value) = prefs.edit().putInt(KEY_WIDGET_MARGIN_TOP, value.coerceIn(0, 32)).apply()
+
+    var widgetMarginBottomDp: Int
+        get() = prefs.getInt(KEY_WIDGET_MARGIN_BOTTOM, 4).coerceIn(0, 32)
+        set(value) = prefs.edit().putInt(KEY_WIDGET_MARGIN_BOTTOM, value.coerceIn(0, 32)).apply()
+
     /** Afficher le dock du widget (indépendant du dock launcher). */
     var dockEnabled: Boolean
         get() = prefs.getBoolean(KEY_DOCK_ENABLED, true)
@@ -74,6 +87,20 @@ class WidgetPrefs(context: Context) {
     var dockJustify: String
         get() = prefs.getString(KEY_DOCK_JUSTIFY, JUSTIFY_CENTER) ?: JUSTIFY_CENTER
         set(value) = prefs.edit().putString(KEY_DOCK_JUSTIFY, value).apply()
+
+    var dockShowLabels: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_SHOW_LABELS, false)
+        set(value) = prefs.edit().putBoolean(KEY_DOCK_SHOW_LABELS, value).apply()
+
+    /** Marge au-dessus du dock (0 = collé à la liste). */
+    var dockMarginTopDp: Int
+        get() = prefs.getInt(KEY_DOCK_MARGIN_TOP, 4).coerceIn(0, 24)
+        set(value) = prefs.edit().putInt(KEY_DOCK_MARGIN_TOP, value.coerceIn(0, 24)).apply()
+
+    /** Marge en-dessous du dock. */
+    var dockMarginBottomDp: Int
+        get() = prefs.getInt(KEY_DOCK_MARGIN_BOTTOM, 4).coerceIn(0, 24)
+        set(value) = prefs.edit().putInt(KEY_DOCK_MARGIN_BOTTOM, value.coerceIn(0, 24)).apply()
 
     /**
      * Garantit des slots persistés avec IDs stables.
@@ -134,6 +161,20 @@ class WidgetPrefs(context: Context) {
         }
     }
 
+    /** Déplace un slot de [delta] positions (−1 = monter, +1 = descendre). */
+    fun moveDockSlot(id: String, delta: Int): Boolean {
+        if (delta == 0) return false
+        val list = getDockSlots().toMutableList()
+        val idx = list.indexOfFirst { it.id == id }
+        if (idx < 0) return false
+        val target = (idx + delta).coerceIn(0, list.lastIndex)
+        if (target == idx) return false
+        val item = list.removeAt(idx)
+        list.add(target, item)
+        setDockSlots(list)
+        return true
+    }
+
     private fun parseDockSlots(raw: String): List<DockSlot>? {
         return runCatching {
             val arr = JSONArray(raw)
@@ -175,12 +216,18 @@ class WidgetPrefs(context: Context) {
         private const val KEY_SHOW_COVER = "show_cover_letter"
         private const val KEY_SHOW_PAGES = "show_pages"
         private const val KEY_DARK = "dark_theme"
+        private const val KEY_HISTORY_FONT = "history_font_sp"
+        private const val KEY_WIDGET_MARGIN_TOP = "widget_margin_top"
+        private const val KEY_WIDGET_MARGIN_BOTTOM = "widget_margin_bottom"
         private const val KEY_DOCK_ENABLED = "dock_enabled"
         private const val KEY_DOCK_TOP = "dock_top"
         private const val KEY_PKG_MODE = "pkg_mode"
         private const val KEY_DOCK_SIZE = "dock_icon_size"
         private const val KEY_DOCK_BORDER = "dock_icon_border"
         private const val KEY_DOCK_JUSTIFY = "dock_justify"
+        private const val KEY_DOCK_SHOW_LABELS = "dock_show_labels"
+        private const val KEY_DOCK_MARGIN_TOP = "dock_margin_top"
+        private const val KEY_DOCK_MARGIN_BOTTOM = "dock_margin_bottom"
         private const val KEY_DOCK = "dock_slots"
 
         fun defaultDock(): List<DockSlot> = listOf(

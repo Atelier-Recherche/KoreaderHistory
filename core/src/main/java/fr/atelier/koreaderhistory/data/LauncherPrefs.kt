@@ -99,6 +99,24 @@ class LauncherPrefs(context: Context) {
             prefs.edit().putString(KEY_DOCK_JUSTIFY, value).commit()
         }
 
+    var dockShowLabels: Boolean
+        get() = prefs.getBoolean(KEY_DOCK_SHOW_LABELS, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_DOCK_SHOW_LABELS, value).commit()
+        }
+
+    var dockMarginTopDp: Int
+        get() = prefs.getInt(KEY_DOCK_MARGIN_TOP, 8).coerceIn(0, 24)
+        set(value) {
+            prefs.edit().putInt(KEY_DOCK_MARGIN_TOP, value.coerceIn(0, 24)).commit()
+        }
+
+    var dockMarginBottomDp: Int
+        get() = prefs.getInt(KEY_DOCK_MARGIN_BOTTOM, 8).coerceIn(0, 24)
+        set(value) {
+            prefs.edit().putInt(KEY_DOCK_MARGIN_BOTTOM, value.coerceIn(0, 24)).commit()
+        }
+
     var desktopIconSizeDp: Int
         get() = prefs.getInt(KEY_DESKTOP_SIZE, 56).coerceIn(28, 120)
         set(value) {
@@ -353,6 +371,20 @@ class LauncherPrefs(context: Context) {
         setDockSlots(getDockSlots().filterNot { it.id == id })
     }
 
+    /** Déplace un slot de [delta] positions (−1 = monter, +1 = descendre). */
+    fun moveDockSlot(id: String, delta: Int): Boolean {
+        if (delta == 0) return false
+        val list = getDockSlots().toMutableList()
+        val idx = list.indexOfFirst { it.id == id }
+        if (idx < 0) return false
+        val target = (idx + delta).coerceIn(0, list.lastIndex)
+        if (target == idx) return false
+        val item = list.removeAt(idx)
+        list.add(target, item)
+        setDockSlots(list)
+        return true
+    }
+
     fun getDesktopItems(): List<DesktopItem> {
         val raw = prefs.getString(KEY_DESKTOP, null) ?: return emptyList()
         val items = runCatching {
@@ -483,17 +515,28 @@ class LauncherPrefs(context: Context) {
         return true
     }
 
-    fun saveDockVisualOptions(sizeDp: Int, border: Boolean, justify: String, enabled: Boolean = dockEnabled): Boolean {
+    fun saveDockVisualOptions(
+        sizeDp: Int,
+        border: Boolean,
+        justify: String,
+        enabled: Boolean = dockEnabled,
+        showLabels: Boolean = dockShowLabels,
+        marginTopDp: Int = dockMarginTopDp,
+        marginBottomDp: Int = dockMarginBottomDp,
+    ): Boolean {
         return prefs.edit()
             .putBoolean(KEY_DOCK_ENABLED, enabled)
             .putInt(KEY_DOCK_SIZE, sizeDp.coerceIn(28, 120))
             .putBoolean(KEY_DOCK_BORDER, border)
             .putString(KEY_DOCK_JUSTIFY, justify)
+            .putBoolean(KEY_DOCK_SHOW_LABELS, showLabels)
+            .putInt(KEY_DOCK_MARGIN_TOP, marginTopDp.coerceIn(0, 24))
+            .putInt(KEY_DOCK_MARGIN_BOTTOM, marginBottomDp.coerceIn(0, 24))
             .commit()
     }
 
     fun readDockVisualDebug(): String =
-        "enabled=$dockEnabled size=${dockIconSizeDp} border=$dockIconBorder justify=$dockJustify"
+        "enabled=$dockEnabled size=${dockIconSizeDp} border=$dockIconBorder justify=$dockJustify labels=$dockShowLabels margin=${dockMarginTopDp}/${dockMarginBottomDp}"
 
     fun updateDesktopItem(item: DesktopItem) {
         val items = getDesktopItems().toMutableList()
@@ -591,6 +634,9 @@ class LauncherPrefs(context: Context) {
         private const val KEY_DOCK_SIZE = "launcher_dock_icon_size"
         private const val KEY_DOCK_BORDER = "launcher_dock_icon_border"
         private const val KEY_DOCK_JUSTIFY = "launcher_dock_justify"
+        private const val KEY_DOCK_SHOW_LABELS = "launcher_dock_show_labels"
+        private const val KEY_DOCK_MARGIN_TOP = "launcher_dock_margin_top"
+        private const val KEY_DOCK_MARGIN_BOTTOM = "launcher_dock_margin_bottom"
         private const val KEY_DESKTOP_SIZE = "desktop_icon_size"
         private const val KEY_DESKTOP_BORDER = "desktop_icon_border"
         private const val KEY_DRAWER_SIZE = "drawer_icon_size"

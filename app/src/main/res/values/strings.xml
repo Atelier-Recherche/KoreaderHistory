@@ -57,6 +57,14 @@
     <string name="dock_justify">Alignement du dock</string>
     <string name="dock_justify_center">Centré</string>
     <string name="dock_justify_space">Justifié (bords)</string>
+    <string name="dock_show_labels">Afficher les noms sous le dock</string>
+    <string name="history_font_size">Taille de police de l’historique</string>
+    <string name="widget_margin_top">Marge haut du widget</string>
+    <string name="widget_margin_bottom">Marge bas du widget</string>
+    <string name="dock_margin_top">Marge au-dessus du dock</string>
+    <string name="dock_margin_bottom">Marge en-dessous du dock</string>
+    <string name="dock_move_up">Monter</string>
+    <string name="dock_move_down">Descendre</string>
     <string name="pick_icon_visual">Choisir une icône</string>
     <string name="icon_search_hint">Filtrer les icônes…</string>
     <string name="icon_source_catalog">Catalogue</string>

@@ -1,79 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/book_item_root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:background="?android:attr/selectableItemBackground"
-    android:clickable="true"
-    android:focusable="true"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingHorizontal="6dp"
-    android:paddingVertical="6dp">
-
-    <TextView
-        android:id="@+id/cover_letter"
-        android:layout_width="36dp"
-        android:layout_height="48dp"
-        android:background="@drawable/cover_placeholder"
-        android:gravity="center"
-        android:textColor="@color/eink_fg"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+    android:layout_height="wrap_content">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:id="@+id/book_item_root"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="6dp">
 
         <TextView
-            android:id="@+id/book_title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="2"
+            android:id="@+id/cover_letter"
+            android:layout_width="36dp"
+            android:layout_height="48dp"
+            android:background="@drawable/cover_placeholder"
+            android:gravity="center"
             android:textColor="@color/eink_fg"
-            android:textSize="13sp"
+            android:textSize="16sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/book_author"
-            android:layout_width="match_parent"
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/eink_muted"
-            android:textSize="11sp" />
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/book_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/eink_fg"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/book_author"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/eink_muted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/book_pages"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/eink_muted"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <ProgressBar
+                android:id="@+id/book_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progressDrawable="@drawable/progress_eink" />
+        </LinearLayout>
 
         <TextView
-            android:id="@+id/book_pages"
-            android:layout_width="match_parent"
+            android:id="@+id/book_percent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/eink_muted"
-            android:textSize="11sp"
-            android:visibility="gone" />
-
-        <ProgressBar
-            android:id="@+id/book_progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="4dp"
-            android:max="100"
-            android:progressDrawable="@drawable/progress_eink" />
+            android:layout_marginStart="6dp"
+            android:gravity="end"
+            android:minWidth="36dp"
+            android:textColor="@color/eink_fg"
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/book_percent"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
-        android:gravity="end"
-        android:minWidth="36dp"
-        android:textColor="@color/eink_fg"
-        android:textSize="12sp" />
-</LinearLayout>
+    <ImageView
+        android:id="@+id/btn_refresh"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="end|bottom"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/refresh"
+        android:padding="4dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_refresh"
+        android:visibility="gone" />
+</FrameLayout>

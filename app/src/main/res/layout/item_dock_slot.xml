@@ -34,4 +34,26 @@
             android:textColor="@color/eink_muted"
             android:textSize="12sp" />
     </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <ImageButton
+            android:id="@+id/btn_move_up"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/dock_move_up"
+            android:src="@android:drawable/arrow_up_float" />
+
+        <ImageButton
+            android:id="@+id/btn_move_down"
+            android:layout_width="40dp"
+            android:layout_height="36dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/dock_move_down"
+            android:src="@android:drawable/arrow_down_float" />
+    </LinearLayout>
 </LinearLayout>

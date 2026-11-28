@@ -34,11 +34,15 @@ class LauncherDockEditorActivity : AppCompatActivity() {
     private lateinit var sizeSpinner: Spinner
     private lateinit var enabledCheck: CheckBox
     private lateinit var borderCheck: CheckBox
+    private lateinit var showLabelsCheck: CheckBox
     private lateinit var justifySpinner: Spinner
+    private lateinit var marginTopSpinner: Spinner
+    private lateinit var marginBottomSpinner: Spinner
     private lateinit var statusView: TextView
     private var suppressAutoSave = true
     private var pendingBuiltin: BuiltinIconTarget = BuiltinIconTarget.APPS
     private val sizes = listOf(32, 44, 48, 56, 72)
+    private val dockMargins = listOf(0, 2, 4, 8, 12, 16, 24)
     private val justifyModes = listOf(LauncherPrefs.JUSTIFY_CENTER, LauncherPrefs.JUSTIFY_SPACE_BETWEEN)
 
     private enum class BuiltinIconTarget { APPS, NOTIFS }
@@ -101,6 +105,12 @@ class LauncherDockEditorActivity : AppCompatActivity() {
         }
         header.addView(borderCheck)
 
+        showLabelsCheck = CheckBox(this).apply {
+            text = getString(R.string.dock_show_labels)
+            setTextColor(0xFF000000.toInt())
+        }
+        header.addView(showLabelsCheck)
+
         justifySpinner = Spinner(this).apply {
             this.adapter = ArrayAdapter(
                 this@LauncherDockEditorActivity,
@@ -110,6 +120,26 @@ class LauncherDockEditorActivity : AppCompatActivity() {
         }
         header.addView(label(getString(R.string.dock_justify)))
         header.addView(justifySpinner)
+
+        marginTopSpinner = Spinner(this).apply {
+            this.adapter = ArrayAdapter(
+                this@LauncherDockEditorActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                dockMargins.map { "${it}dp" },
+            )
+        }
+        header.addView(label(getString(R.string.dock_margin_top)))
+        header.addView(marginTopSpinner)
+
+        marginBottomSpinner = Spinner(this).apply {
+            this.adapter = ArrayAdapter(
+                this@LauncherDockEditorActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                dockMargins.map { "${it}dp" },
+            )
+        }
+        header.addView(label(getString(R.string.dock_margin_bottom)))
+        header.addView(marginBottomSpinner)
 
         statusView = TextView(this).apply {
             setTextColor(0xFF444444.toInt())
@@ -159,6 +189,11 @@ class LauncherDockEditorActivity : AppCompatActivity() {
                 prefs.removeDockSlot(slot.id)
                 reloadSlots()
             },
+            onMove = { slot, delta ->
+                if (prefs.moveDockSlot(slot.id, delta)) {
+                    reloadSlots()
+                }
+            },
         )
         list.adapter = listAdapter
         root.addView(list)
@@ -190,7 +225,10 @@ class LauncherDockEditorActivity : AppCompatActivity() {
         enabledCheck.isChecked = prefs.dockEnabled
         sizeSpinner.setSelection(sizes.indexOf(prefs.dockIconSizeDp).let { if (it >= 0) it else 2 })
         borderCheck.isChecked = prefs.dockIconBorder
+        showLabelsCheck.isChecked = prefs.dockShowLabels
         justifySpinner.setSelection(justifyModes.indexOf(prefs.dockJustify).coerceAtLeast(0))
+        marginTopSpinner.setSelection(dockMargins.indexOf(prefs.dockMarginTopDp).let { if (it >= 0) it else 3 })
+        marginBottomSpinner.setSelection(dockMargins.indexOf(prefs.dockMarginBottomDp).let { if (it >= 0) it else 3 })
         statusView.text = "Actuel : ${prefs.readDockVisualDebug()}"
         suppressAutoSave = false
     }
@@ -204,21 +242,35 @@ class LauncherDockEditorActivity : AppCompatActivity() {
         }
         sizeSpinner.onItemSelectedListener = listener
         justifySpinner.onItemSelectedListener = listener
+        marginTopSpinner.onItemSelectedListener = listener
+        marginBottomSpinner.onItemSelectedListener = listener
         val checkListener = { _: android.widget.CompoundButton, _: Boolean ->
             if (!suppressAutoSave) persistOptions(showToast = false, finishAfter = false)
         }
         enabledCheck.setOnCheckedChangeListener(checkListener)
         borderCheck.setOnCheckedChangeListener(checkListener)
+        showLabelsCheck.setOnCheckedChangeListener(checkListener)
     }
 
     private fun persistOptions(showToast: Boolean, finishAfter: Boolean) {
         val size = sizes.getOrElse(sizeSpinner.selectedItemPosition) { 48 }
         val border = borderCheck.isChecked
         val enabled = enabledCheck.isChecked
+        val showLabels = showLabelsCheck.isChecked
+        val marginTop = dockMargins.getOrElse(marginTopSpinner.selectedItemPosition) { 8 }
+        val marginBottom = dockMargins.getOrElse(marginBottomSpinner.selectedItemPosition) { 8 }
         val justify = justifyModes.getOrElse(justifySpinner.selectedItemPosition) {
             LauncherPrefs.JUSTIFY_CENTER
         }
-        val ok = prefs.saveDockVisualOptions(size, border, justify, enabled)
+        val ok = prefs.saveDockVisualOptions(
+            sizeDp = size,
+            border = border,
+            justify = justify,
+            enabled = enabled,
+            showLabels = showLabels,
+            marginTopDp = marginTop,
+            marginBottomDp = marginBottom,
+        )
         WidgetLog.file(this, "dock visual save ok=$ok → ${prefs.readDockVisualDebug()}")
         statusView.text = if (ok) {
             "Enregistré : ${prefs.readDockVisualDebug()}"
@@ -322,6 +374,7 @@ class LauncherDockEditorActivity : AppCompatActivity() {
     private class Adapter(
         private val onClick: (DockSlot) -> Unit,
         private val onDelete: (DockSlot) -> Unit,
+        private val onMove: (DockSlot, Int) -> Unit,
     ) : RecyclerView.Adapter<Adapter.VH>() {
         private var items: List<DockSlot> = emptyList()
 
@@ -343,6 +396,17 @@ class LauncherDockEditorActivity : AppCompatActivity() {
             holder.b.appIcon.setImageDrawable(DockIconResolver.loadDrawable(holder.b.root.context, slot))
             holder.b.root.setOnClickListener { onClick(slot) }
             holder.b.root.setOnLongClickListener { onDelete(slot); true }
+
+            holder.b.btnMoveUp.visibility = View.VISIBLE
+            holder.b.btnMoveDown.visibility = View.VISIBLE
+            holder.b.btnMoveLeft.visibility = View.GONE
+            holder.b.btnMoveRight.visibility = View.GONE
+            holder.b.btnMoveUp.isEnabled = position > 0
+            holder.b.btnMoveDown.isEnabled = position < items.lastIndex
+            holder.b.btnMoveUp.alpha = if (position > 0) 1f else 0.3f
+            holder.b.btnMoveDown.alpha = if (position < items.lastIndex) 1f else 0.3f
+            holder.b.btnMoveUp.setOnClickListener { onMove(slot, -1) }
+            holder.b.btnMoveDown.setOnClickListener { onMove(slot, 1) }
         }
 
         class VH(val b: ItemDesktopAppBinding) : RecyclerView.ViewHolder(b.root)

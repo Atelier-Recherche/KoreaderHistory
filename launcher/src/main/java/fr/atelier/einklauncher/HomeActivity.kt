@@ -560,12 +560,53 @@ class HomeActivity : AppCompatActivity() {
         }
         binding.launcherDock.visibility = View.VISIBLE
         binding.launcherDock.removeAllViews()
+        val density = resources.displayMetrics.density
+        val padTop = (launcherPrefs.dockMarginTopDp * density).toInt()
+        val padBottom = (launcherPrefs.dockMarginBottomDp * density).toInt()
+        val padH = (8 * density).toInt()
+        binding.launcherDock.setPadding(padH, padTop, padH, padBottom)
+
         val size = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,
             launcherPrefs.dockIconSizeDp.toFloat(),
             resources.displayMetrics,
         ).toInt()
         val border = launcherPrefs.dockIconBorder
+        val showLabels = launcherPrefs.dockShowLabels
+
+        fun addDockColumn(
+            iconView: View,
+            labelText: String,
+            click: () -> Unit,
+            longClick: (() -> Boolean)? = null,
+        ) {
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { setMargins(4, 0, 4, 0) }
+                setOnClickListener { click() }
+                if (longClick != null) setOnLongClickListener { longClick() }
+            }
+            col.addView(iconView)
+            if (showLabels && labelText.isNotBlank()) {
+                col.addView(
+                    TextView(this).apply {
+                        text = labelText
+                        setTextColor(0xFF000000.toInt())
+                        textSize = 9f
+                        gravity = Gravity.CENTER_HORIZONTAL
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        maxWidth = (size * 1.4f).toInt().coerceAtLeast(48)
+                        setPadding(0, 2, 0, 0)
+                    },
+                )
+            }
+            binding.launcherDock.addView(col)
+        }
 
         fun addBuiltin(
             override: fr.atelier.koreaderhistory.data.AppIconOverride,
@@ -575,7 +616,7 @@ class HomeActivity : AppCompatActivity() {
             click: () -> Unit,
         ) {
             val frame = FrameLayout(this)
-            frame.layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(4, 0, 4, 0) }
+            frame.layoutParams = LinearLayout.LayoutParams(size, size)
             val iv = ImageView(this)
             iv.layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -599,8 +640,7 @@ class HomeActivity : AppCompatActivity() {
                 badge.text = if (badgeCount > 99) "99+" else badgeCount.toString()
                 frame.addView(badge)
             }
-            frame.setOnClickListener { click() }
-            binding.launcherDock.addView(frame)
+            addDockColumn(frame, desc, click)
         }
 
         addBuiltin(
@@ -627,18 +667,21 @@ class HomeActivity : AppCompatActivity() {
                 binding.launcherDock.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
             }
             val iv = ImageView(this)
-            iv.layoutParams = LinearLayout.LayoutParams(size, size).apply { setMargins(4, 0, 4, 0) }
+            iv.layoutParams = LinearLayout.LayoutParams(size, size)
             iv.setPadding(6, 6, 6, 6)
             iv.scaleType = ImageView.ScaleType.FIT_CENTER
             if (border) iv.setBackgroundResource(R.drawable.dock_button_bg)
             iv.setImageDrawable(DockIconResolver.loadDrawable(this, slot))
             iv.contentDescription = slot.label
-            iv.setOnClickListener { DockExecutor.execute(this, widgetPrefs, slot) }
-            iv.setOnLongClickListener {
-                startActivity(Intent(this, LauncherDockEditorActivity::class.java))
-                true
-            }
-            binding.launcherDock.addView(iv)
+            addDockColumn(
+                iv,
+                slot.label,
+                click = { DockExecutor.execute(this, widgetPrefs, slot) },
+                longClick = {
+                    startActivity(Intent(this, LauncherDockEditorActivity::class.java))
+                    true
+                },
+            )
         }
     }
 

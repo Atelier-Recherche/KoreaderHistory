@@ -115,6 +115,42 @@
             android:text="@string/dark_theme"
             android:textColor="@color/eink_fg" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/history_font_size"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_history_font"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/widget_margin_top"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_widget_margin_top"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/widget_margin_bottom"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_widget_margin_bottom"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <CheckBox
             android:id="@+id/check_dock_enabled"
             android:layout_width="match_parent"
@@ -134,6 +170,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/dock_icon_border"
+            android:textColor="@color/eink_fg" />
+
+        <CheckBox
+            android:id="@+id/check_dock_show_labels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/dock_show_labels"
             android:textColor="@color/eink_fg" />
 
         <TextView
@@ -157,6 +200,30 @@
 
         <Spinner
             android:id="@+id/spinner_dock_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/dock_margin_top"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_dock_margin_top"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/dock_margin_bottom"
+            android:textColor="@color/eink_fg" />
+
+        <Spinner
+            android:id="@+id/spinner_dock_margin_bottom"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 

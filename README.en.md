@@ -6,7 +6,7 @@
 <td><img src="readme-media/logo_koreaderhistory.png" alt="KOReader History" width="140" /></td>
 <td align="left">
 <h1 style="margin:0">KOReader History</h1>
-<p style="margin:0.25em 0 0"><strong>History widget · Dock · Android</strong><br/>App · athistory.koplugin bridge · l’Atelier</p>
+<p style="margin:0.25em 0 0"><strong>Widget · Dock · E-ink launcher · Android</strong><br/>Apps · athistory.koplugin bridge · l’Atelier</p>
 </td>
 </tr>
 </table>
@@ -38,34 +38,45 @@
 
 ## 📖 About
 
-Android app **KOReader History** (by l’Atelier): reading-history widget and action dock, linked to KOReader through the **Atelier History Bridge** plugin (`athistory.koplugin`).
+Android monorepo (by l’Atelier) with **two independent apps** and a shared KOReader bridge:
 
-The widget reads KOReader history on the device; the dock can open KOReader, a book, an app, a URI, or ask the bridge to run an action inside KOReader (history, folder, collection, plugin, dispatcher…).
+1. **KOReader History** — reading-history widget + action dock  
+2. **Atelier e-ink Launcher** — fullscreen home launcher aimed at e-ink / Boox (desktop, dock, drawer, notifications…)
+
+Both apps share `core/` and the **Atelier History Bridge** plugin (`athistory.koplugin`). The **widget dock** and the **launcher dock** are **separate** (distinct prefs and slots): you can install only the widget, only the launcher, or both.
 
 ## 🧩 Components
 
-| Piece | Role |
-|-------|------|
-| Android app (`app/`, Gradle) | Widget + configuration + dock |
-| `athistory.koplugin` | Bridge: reads `settings/athistory/pending.lua` and runs the action |
-| Bundled assets | Bridge copy installable from the app |
-
-Package: `fr.atelier.koreaderhistory`.
+| Piece | Package / path | Role |
+|-------|----------------|------|
+| Widget app | `fr.atelier.koreaderhistory` (`app/`) | History widget + config + widget dock |
+| Launcher | `fr.atelier.einklauncher` (`launcher/`) | E-ink home: desktop, dock, apps, notifs |
+| Core | `core/` | Prefs, history, dock, icons, bridge helpers |
+| `athistory.koplugin` | KOReader plugins | Bridge: reads `settings/athistory/pending.lua` and runs the action |
+| `deploy.ps1` | repo root | Build + install both APKs + ADB grants + push plugin |
 
 ## ⬇️ Installation
 
-### Android application
+### Via `deploy.ps1` (recommended)
+
+```powershell
+.\deploy.ps1            # build if needed + install widget + launcher + plugin
+.\deploy.ps1 -Force     # force rebuild
+.\deploy.ps1 -SkipInstall
+```
+
+### Manual
 
 1. Open the Gradle project (`ATkoreaderhistory`)
-2. Build: `gradlew.bat assembleDebug` (or Android Studio)
-3. Install the APK on the device
+2. Build: `gradlew.bat :app:assembleDebug :launcher:assembleDebug`
+3. Install the APKs on the device
 4. Grant **All files access** (needed to read KOReader history)
-5. Add the **KOReader History** widget to the home screen
-6. Configure KOReader path, item count, filters, theme, dock…
+5. **Widget**: add **KOReader History** to the home screen and configure  
+6. **Launcher** (optional): set **Atelier e-ink Launcher** as the default home app; enable notification / accessibility / usage access as needed
 
 ### KOReader bridge
 
-From the app: **Install KOReader bridge** (copies `athistory.koplugin` into KOReader plugins), **or** copy manually:
+From the widget app: **Install KOReader bridge**, via `deploy.ps1`, **or** copy manually:
 
 ```
 <koreader>/plugins/athistory.koplugin/
@@ -75,13 +86,31 @@ From the app: **Install KOReader bridge** (copies `athistory.koplugin` into KORe
 
 Then restart KOReader and enable the plugin if needed.
 
-## ✏️ Usage
+## ✏️ Usage — widget
 
-* The widget shows recent books (cover / title / author / percent depending on options)
+* Shows recent books (cover / title / author / percent depending on options)
 * A tap opens the book in KOReader
-* The **dock** (configurable icons) launches Android actions or writes a “pending” action then opens KOReader; the bridge executes it on startup
+* The **widget dock** (independent from the launcher) launches Android actions or writes a “pending” action; the bridge runs it when KOReader starts
+* **Show dock** toggle + **Edit dock** / restore default shortcuts
 
-### Dock actions
+## 🏠 Usage — e-ink launcher
+
+Fullscreen (system status bar hidden). Long-press the desktop for the menu.
+
+| Area | Content |
+|------|---------|
+| Status bar (optional) | Time, date (formats: Monday, Mon 27 Nov, …), Wi‑Fi, Bluetooth, battery |
+| Android widgets | Add / resize / reorder |
+| History panel | KOReader books + Remove button |
+| Desktop grid | Apps, folders, KOReader shortcuts — adjustable columns / sizes, cell placement |
+| Launcher dock | Apps + notifications (badge) + custom slots — show/hide independent from the widget |
+| App drawer | Search, pin to dock, custom icons, hide apps |
+
+**Move mode**: desktop menu → *Move mode* → arrows on each icon → *Done*.
+
+Also: Alt+Tab / task bar, notification listener, accessibility service (hotkeys), icon packs (full list + search).
+
+## 🎯 Dock actions (widget & launcher)
 
 | Action | Side | Description |
 |--------|------|-------------|
@@ -97,12 +126,23 @@ Then restart KOReader and enable the plugin if needed.
 | System action | Bridge | Module / dispatcher |
 | Dispatcher (free ID) | Bridge | Dispatcher action ID |
 
-## ⚙️ Widget configuration
+## ⚙️ Configuration
+
+### Widget (`fr.atelier.koreaderhistory`)
 
 * KOReader folder, package (`org.koreader.launcher` / F-Droid / auto)
 * Item count, exclude finished / non-books
 * Show author / percent / pages, filename, letter cover, dark theme
-* Dock on top, icon size, slot editing
+* Dock: show, top/bottom, size, borders, slot editing
+
+### Launcher (`fr.atelier.einklauncher`)
+
+* Sizes / borders / columns: dock, desktop, drawer
+* Fonts: desktop / drawer labels, status bar, history
+* Status bar: elements + date format
+* Hidden apps / custom icons (drawer & desktop)
+* Customizable dock **Apps** and **Notifications** icons
+* Links: storage, home, accessibility, notifications, usage stats
 
 ## 🔗 Resources
 

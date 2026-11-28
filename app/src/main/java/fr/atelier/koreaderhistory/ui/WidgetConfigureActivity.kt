@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.os.Bundle
 import android.widget.ArrayAdapter
+import android.widget.Spinner
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import fr.atelier.koreaderhistory.R
@@ -36,6 +37,9 @@ class WidgetConfigureActivity : AppCompatActivity() {
             getString(R.string.dock_size_xxl),
         )
     }
+    private val fontSizes = listOf(10, 11, 12, 13, 14, 15, 16, 18)
+    private val widgetMargins = listOf(0, 2, 4, 8, 12, 16, 24, 32)
+    private val dockMargins = listOf(0, 2, 4, 8, 12, 16, 24)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +67,13 @@ class WidgetConfigureActivity : AppCompatActivity() {
         binding.checkDockEnabled.isChecked = prefs.dockEnabled
         binding.checkDockTop.isChecked = prefs.dockOnTop
         binding.checkDockBorder.isChecked = prefs.dockIconBorder
+        binding.checkDockShowLabels.isChecked = prefs.dockShowLabels
+
+        bindIntSpinner(binding.spinnerHistoryFont, fontSizes, prefs.historyFontSp) { "${it}sp" }
+        bindIntSpinner(binding.spinnerWidgetMarginTop, widgetMargins, prefs.widgetMarginTopDp) { "${it}dp" }
+        bindIntSpinner(binding.spinnerWidgetMarginBottom, widgetMargins, prefs.widgetMarginBottomDp) { "${it}dp" }
+        bindIntSpinner(binding.spinnerDockMarginTop, dockMargins, prefs.dockMarginTopDp) { "${it}dp" }
+        bindIntSpinner(binding.spinnerDockMarginBottom, dockMargins, prefs.dockMarginBottomDp) { "${it}dp" }
 
         val justifyModes = listOf(WidgetPrefs.JUSTIFY_CENTER, WidgetPrefs.JUSTIFY_SPACE_BETWEEN)
         val justifyLabels = listOf(
@@ -114,6 +125,23 @@ class WidgetConfigureActivity : AppCompatActivity() {
         binding.btnSave.setOnClickListener { saveAndFinish() }
     }
 
+    private fun bindIntSpinner(
+        spinner: Spinner,
+        values: List<Int>,
+        current: Int,
+        label: (Int) -> String,
+    ) {
+        spinner.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            values.map(label),
+        )
+        spinner.setSelection(values.indexOf(current).let { if (it >= 0) it else 0 })
+    }
+
+    private fun selectedInt(spinner: Spinner, values: List<Int>, fallback: Int): Int =
+        values.getOrElse(spinner.selectedItemPosition) { fallback }
+
     private fun saveAndFinish() {
         prefs.koreaderPath = binding.inputPath.text?.toString().orEmpty().ifBlank { WidgetPrefs.DEFAULT_PATH }
         prefs.itemCount = binding.inputCount.text?.toString()?.toIntOrNull() ?: 8
@@ -125,15 +153,21 @@ class WidgetConfigureActivity : AppCompatActivity() {
         prefs.showCoverLetter = binding.checkShowCover.isChecked
         prefs.showPages = binding.checkShowPages.isChecked
         prefs.darkTheme = binding.checkDark.isChecked
+        prefs.historyFontSp = selectedInt(binding.spinnerHistoryFont, fontSizes, 13)
+        prefs.widgetMarginTopDp = selectedInt(binding.spinnerWidgetMarginTop, widgetMargins, 4)
+        prefs.widgetMarginBottomDp = selectedInt(binding.spinnerWidgetMarginBottom, widgetMargins, 4)
         prefs.dockEnabled = binding.checkDockEnabled.isChecked
         prefs.dockOnTop = binding.checkDockTop.isChecked
         prefs.dockIconBorder = binding.checkDockBorder.isChecked
+        prefs.dockShowLabels = binding.checkDockShowLabels.isChecked
         prefs.dockJustify = listOf(
             WidgetPrefs.JUSTIFY_CENTER,
             WidgetPrefs.JUSTIFY_SPACE_BETWEEN,
         ).getOrElse(binding.spinnerDockJustify.selectedItemPosition) { WidgetPrefs.JUSTIFY_CENTER }
         prefs.koreaderPackageMode = packageModes.getOrElse(binding.spinnerPackage.selectedItemPosition) { "auto" }
         prefs.dockIconSizeDp = dockSizes.getOrElse(binding.spinnerDockSize.selectedItemPosition) { 44 }
+        prefs.dockMarginTopDp = selectedInt(binding.spinnerDockMarginTop, dockMargins, 4)
+        prefs.dockMarginBottomDp = selectedInt(binding.spinnerDockMarginBottom, dockMargins, 4)
 
         if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             val mgr = AppWidgetManager.getInstance(this)
